@@ -1,0 +1,11 @@
+# Correct version:
+#  http://tillahoffmann.github.io/2017/04/17/versioning-jupyter-notebooks-with-git.html
+# [filter "jupyternotebook"]
+#    clean = jupyter nbconvert --stdin --stdout --log-level=ERROR --to notebook --ClearOutputPreprocessor.enabled=True
+#	smudge = cat
+# 	required = true
+
+# First version https://zhauniarovich.com/post/2020/2020-10-clearing-jupyter-output-p3/
+# was actually broken!
+#
+*.ipynb filter=jupyternotebook
