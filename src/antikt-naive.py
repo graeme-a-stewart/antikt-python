@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 import pyhepmc
 import vector
+import sys
 
 from copy import deepcopy
 
@@ -22,6 +23,9 @@ def read_jet_particles(file="../data/events.hepmc3/events.hepmc3", skip=0):
         # Particle status 1 = Undecayed physical particle
         if particle.status == 1:
             fsparticles.append(iparticle)
+        # Artificially limit particles for debugging
+        # if len(fsparticles) == 10:
+        #     break
     print(f"Final state particles: {len(fsparticles)}")
     nparticles = len(fsparticles)
 
@@ -37,6 +41,7 @@ def read_jet_particles(file="../data/events.hepmc3/events.hepmc3", skip=0):
         E[iparticle] = jet.particles[fsparticle].momentum.e
 
     particles = vector.array({"px": px, "py": py, "pz": pz, "e": E})
+    print(px, len(px))
 
     return particles
 
@@ -47,9 +52,11 @@ def akt_distance(pj1, pj2, r2=0.16):
 
     # Beamline distance
     if pj1 == pj2:
-        return pj1.pt**-2
+        return pj1.pt**-2 / r2
     # AntiKt distance
-    delta2_distance = (pj1.y - pj2.y) ** 2 + (pj1.phi - pj2.phi) ** 2
+    drap = pj1.rapidity - pj2.rapidity
+    dphi = np.pi - np.abs(np.pi - np.abs(pj1.phi - pj2.phi))
+    delta2_distance = drap * drap + dphi * dphi
     min_momentum = min(pj1.pt**-2, pj2.pt**-2)
     return min_momentum * delta2_distance / r2
 
@@ -99,19 +106,14 @@ def merge_pseudo_jets(
     new_e = current_particles[particle_mask].E
 
     if jet_merge_i != jet_merge_j:
-        new_px = np.insert(new_px, len(current_particles[particle_mask]), merged_jet.px)
-        new_py = np.insert(new_py, len(current_particles[particle_mask]), merged_jet.py)
-        new_pz = np.insert(new_pz, len(current_particles[particle_mask]), merged_jet.pz)
-        new_e = np.insert(new_e, len(current_particles[particle_mask]), merged_jet.E)
+        new_px = np.insert(new_px, len(new_px), merged_jet.px)
+        new_py = np.insert(new_py, len(new_py), merged_jet.py)
+        new_pz = np.insert(new_pz, len(new_pz), merged_jet.pz)
+        new_e = np.insert(new_e, len(new_e), merged_jet.E)
 
     next_particles = vector.array(
         {"px": new_px, "py": new_py, "pz": new_pz, "e": new_e}
     )
-    # print(type(current_particles), type(next_particles))
-    # print(len(current_particles), len(next_particles))
-    # next_particles = np.((current_particles[particle_mask], [merged_jet]))
-    # Then append the new merged jet
-    # next_particles = np.insert(next_particles, len(next_particles), merged_jet)
 
     # Recaculate the distances (TODO: update to slicing of the current array,
     # which should work as the distance array is just floats)
@@ -127,8 +129,12 @@ def antikt_jet_finder(initial_particles, r=0.4):
     r2 = r * r
     current_particles = deepcopy(initial_particles)
     current_distances = calculate_antikt_distance(current_particles, r2=r2)
-    print(current_distances)
     final_jets = []
+
+    # print(current_distances)
+    # for iparticle, particle in enumerate(current_particles):
+    #     print(f"{iparticle} {particle.rapidity} {particle.phi} NN: {np.min(current_distances[:,iparticle])}")
+    # sys.exit(0)
 
     # Iterate until done
     while len(current_particles) > 0:
@@ -139,7 +145,7 @@ def antikt_jet_finder(initial_particles, r=0.4):
             print(f"Found a final jet, index {jet_merge_i}")
             final_jets.append(current_particles[jet_merge_i])
             next_particles, next_distances = merge_pseudo_jets(
-                current_particles, current_distances, jet_merge_i, jet_merge_j
+                current_particles, current_distances, jet_merge_i, jet_merge_j, r2=r2
             )
 
         else:
@@ -155,7 +161,7 @@ def antikt_jet_finder(initial_particles, r=0.4):
 
     print(f"Found {len(final_jets)} jets")
     for njet, jet in enumerate(final_jets):
-        print(f"Jet {njet}: {jet}")
+        print(f"Jet {njet}: {jet.rapidity}, {jet.phi}, {jet.pt} ({jet})")
 
 
 def main():
