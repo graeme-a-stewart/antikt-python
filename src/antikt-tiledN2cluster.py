@@ -33,12 +33,10 @@ def main():
     if args.debug:
         logger.setLevel(logging.DEBUG)
 
-    initial_particles = read_jet_particles()
-    logger.info(initial_particles[0])
-    logger.debug("It's cheese time!")
-    print(initial_particles)
+    events = read_jet_particles(file=args.eventfile, skip=args.skip, nevents=args.maxevents)
+    logger.info(events[0][0])
 
-    antikt_jet = faster_tiled_N2_cluster(initial_particles)
+    # antikt_jet = faster_tiled_N2_cluster(initial_particles)
 
 
 if __name__ == "__main__":
