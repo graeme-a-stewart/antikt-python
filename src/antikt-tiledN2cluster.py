@@ -36,7 +36,8 @@ def main():
     events = read_jet_particles(file=args.eventfile, skip=args.skip, nevents=args.maxevents)
     logger.info(events[0][0])
 
-    # antikt_jet = faster_tiled_N2_cluster(initial_particles)
+    for event in events:
+        antikt_jet = faster_tiled_N2_cluster(event, Rparam=0.4, ptmin=0.0)
 
 
 if __name__ == "__main__":
