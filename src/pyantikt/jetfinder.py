@@ -1,31 +1,8 @@
 from copy import deepcopy
 from math import pi, floor, trunc
 from sys import float_info
-
-
-class TilingDef:
-    """Simple class with tiling parameters"""
-
-    def __init__(
-        self,
-        tiles_eta_min,
-        tiles_eta_max,
-        tile_size_eta,
-        tile_size_phi,
-        n_tiles_eta,
-        n_tiles_phi,
-        tiles_ieta_min,
-        tiles_ieta_max,
-    ):
-        self.tiles_eta_min = tiles_eta_min
-        self.tiles_eta_max = tiles_eta_max
-        self.tile_size_eta = tile_size_eta
-        self.tile_size_phi = tile_size_phi
-        self.n_tiles_eta = n_tiles_eta
-        self.n_tiles_phi = n_tiles_phi
-        self.n_tiles = self.n_tiles_eta * self.n_tiles_phi
-        self.tiles_ieta_min = tiles_ieta_min
-        self.tiles_ieta_max = tiles_ieta_max
+from pyantikt.tiles import TilingDef, TiledJet
+from pyantikt.history import HistoryElement, ClusterSequence
 
 
 def determine_rapidity_extent(particles):
@@ -87,7 +64,8 @@ def determine_rapidity_extent(particles):
     # make sure we don't require more particles in a bin than max_in_bin
     allowed_max_cumul = min(max_in_bin, allowed_max_cumul)
 
-    # start scan over rapidity bins from the left, to find out minimum rapidity of tiling
+    # Start scan over rapidity bins from the left, to find out minimum rapidity of tiling
+    # In this code, cumul2 isn't actually used anywhere
     cumul_lo = 0.0
     cumul2 = 0.0
     ibin_lo = 0
@@ -95,7 +73,7 @@ def determine_rapidity_extent(particles):
         cumul_lo += counts[ibin_lo]
         if cumul_lo >= allowed_max_cumul:
             minrap = max(minrap, ibin_lo - nrap)
-            print(minrap, ibin_lo - nrap)
+            # print(minrap, ibin_lo - nrap)
             break
         # print(cumul_lo, ibin_lo)
         ibin_lo += 1
@@ -146,7 +124,7 @@ def determine_rapidity_extent(particles):
         cumul2 += counts[ibin] ** 2
         # print(ibin, cumul2)
 
-    # print(minrap, maxrap, ibin_lo, ibin_hi, cumul2)
+    print(minrap, maxrap, ibin_lo, ibin_hi, cumul2)
 
     return minrap, maxrap
 
@@ -192,6 +170,28 @@ def initial_tiling(particles, Rparam=0.4):
     # Tiling(tiling_setup)
 
 
+def initial_history(particles):
+    """Initialise the clustering history in a standard way,
+    Takes as input the list of stable particles as input
+    Returns the history and the total event energy."""
+
+    # This is going to be a list of HistoryElements
+    history = []
+    Qtot = 0.0
+
+    for i, _ in enumerate(particles):
+        # Add in order, so that HistoryElement[i] -> particle[i]
+        history.append(HistoryElement(jetp_index=i))
+
+        # get cross-referencing right from PseudoJets
+        particles[i].cluster_hist_index = i
+
+        # determine the total energy in the event
+        Qtot += particles[i].E
+
+    return history, Qtot
+
+
 def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
     """Tiled AntiKt Jet finding code, implementing the algorithm originally from FastJet"""
 
@@ -200,4 +200,8 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
 
     # Create a container of PseudoJet objects
     jets = deepcopy(initial_particles)
+    history, Qtot = initial_history(initial_particles)
+
     tiling = initial_tiling(initial_particles, Rparam)
+
+    cs = ClusterSequence(jets, history, tiling, Qtot)

@@ -4,8 +4,8 @@ from math import atan2, pi, log
 # A few saftey factor constants
 _MaxRap = 1e5
 
-_invalid_phi = -100.0
-_invalid_rap = -1.0e200
+# _invalid_phi = -100.0
+# _invalid_rap = -1.0e200
 
 
 class PseudoJet:
