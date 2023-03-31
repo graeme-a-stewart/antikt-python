@@ -1,8 +1,15 @@
 from copy import deepcopy
 from math import pi, floor, trunc
-from sys import float_info
-from pyantikt.tiles import TilingDef, TiledJet
+from sys import float_info, exit
+from pyantikt.tiles import TilingDef, TiledJet, Tiling
 from pyantikt.history import HistoryElement, ClusterSequence
+
+
+def tiledjet_dist(jetA: TiledJet, jetB: TiledJet):
+    '''Distance between two tiled jets'''
+    dphi = pi - abs(pi - abs(jetA.phi - jetB.phi))
+    deta = jetA.eta - jetB.eta
+    return dphi*dphi + deta*deta
 
 
 def determine_rapidity_extent(particles):
@@ -167,7 +174,7 @@ def initial_tiling(particles, Rparam=0.4):
 
     # allocate the tiles
     print(f"Tiling is {n_tiles_eta} x {n_tiles_phi} in eta, phi")
-    # Tiling(tiling_setup)
+    return Tiling(tiling_setup)
 
 
 def initial_history(particles):
@@ -191,6 +198,50 @@ def initial_history(particles):
 
     return history, Qtot
 
+def map_indices_to_julia(tiling_setup, ieta, iphi):
+    '''Debug mapped indices returning the mapping to a single Julia
+    array index, starting from 1'''
+    return 1 + ieta + iphi * tiling_setup.n_tiles_eta
+
+def get_tile_indexes(tiling_setup, eta, phi):
+    '''Return the index of an eta,phi coordinate in the tiling setup'''
+    if eta <= tiling_setup.tiles_eta_min:
+        ieta = 0
+    elif eta >= tiling_setup.tiles_eta_max:
+        ieta = tiling_setup.n_tiles_eta-1
+    else:
+        ieta = int((eta - tiling_setup.tiles_eta_min) / tiling_setup.tile_size_eta)
+        # following needed in case of rare but nasty rounding errors
+        if ieta >= tiling_setup.n_tiles_eta:
+            ieta = tiling_setup.n_tiles_eta-1
+
+    # allow for some extent of being beyond range in calculation of phi
+    # as well
+    #iphi = (int(floor(phi/_tile_size_phi)) + _n_tiles_phi) % _n_tiles_phi;
+    # with just int and no floor, things run faster but beware
+    #iphi = mod(unsafe_trunc(Int, (phi + 2π) / tiling_setup._tile_size_phi),
+    #           tiling_setup._n_tiles_phi)
+    iphi = int(phi * tiling_setup.n_tiles_phi / (2.0 * pi))
+    print(ieta, iphi, map_indices_to_julia(tiling_setup, ieta, iphi))
+    return ieta, iphi
+
+def tiledjet_set_jetinfo(jet, cs, jets_index, R2):
+    '''Setup tiled jet'''
+    tile_indexes = get_tile_indexes(cs.tiling.setup, jet.rap, jet.phi)
+    tiled_jet = TiledJet(id=jets_index,
+                                eta=jet.rap,
+                                phi=jet.phi,
+                                kt2=1.0/jet.pt2,
+                                NN_dist=R2,
+                                jet_index=jets_index,
+                                tile_index=tile_indexes
+                                )
+    cs.tiling.tiles[tile_indexes[0]][tile_indexes[1]].append(tiled_jet)
+    if len(cs.tiling.tiles[tile_indexes[0]][tile_indexes[1]]) > 1:
+        # Do we need this...?
+        tiled_jet.previous = cs.tiling.tiles[tile_indexes[0]][tile_indexes[1]][-2]
+        cs.tiling.tiles[tile_indexes[0]][tile_indexes[1]][-2].next = tiled_jet
+    return tiled_jet
 
 def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
     """Tiled AntiKt Jet finding code, implementing the algorithm originally from FastJet"""
@@ -201,7 +252,51 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
     # Create a container of PseudoJet objects
     jets = deepcopy(initial_particles)
     history, Qtot = initial_history(initial_particles)
+    # print(history, Qtot)
 
+    # Note that this tiling is filled with blanks - there are no
+    # real particles here
     tiling = initial_tiling(initial_particles, Rparam)
+    # print(tiling)
 
     cs = ClusterSequence(jets, history, tiling, Qtot)
+    # print(cs.tiling.tiles)
+    # print(len(cs.tiling.tiles))
+    # for slice in cs.tiling.tiles:
+    #     print(len(slice))
+    # exit(0)
+
+
+
+    # Not sure we need this - it's a caching object the original code
+    tile_union = []
+
+    # Fill basic jet information  to a list of TiledJets
+    tiledjets = []
+    for ijet, jet in enumerate(jets):
+        tiledjets.append(tiledjet_set_jetinfo(jet, cs, ijet, R2))
+        # print(ijet, tiledjets[-1])
+
+    print(len(tiledjets))
+
+    # set up the initial nearest neighbour information
+    for tilerow in cs.tiling.tiles:
+        for tile in tilerow:
+            # In our implementation tile is the list of TiledJets
+            # so we can just iterate
+            print(f"Start tile length {len(tile)}")
+            for ijetA, jetA in enumerate(tile, start=1):
+                for ijetB, jetB in enumerate(tile[ijetA:], start=ijetA):
+                    print(f"A, B: {ijetA-1}, {ijetB}")
+                    if jetB == jetA:
+                        break
+                    dist = tiledjet_dist(jetA, jetB)
+                    print(dist)
+                    if (dist < jetA.NN_dist):
+                        jetA.NN_dist = dist
+                        jetA.NN = jetB
+                    if dist < jetB.NN_dist:
+                        jetB.NN_dist = dist
+                        jetB.NN = jetA
+
+    exit(0)

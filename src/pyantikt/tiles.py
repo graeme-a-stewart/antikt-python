@@ -19,7 +19,7 @@ class TiledJet:
     kt2: float = 0.0
     NN_dist: float = 0.0
     jet_index: int = -1
-    tile_index: int = -1
+    tile_index: tuple[int, int] | None = (-1, -1)
     diJ_posn: int = -1
     # Cannot use a TiledJet type here as the class isn't yet defined
     # This is a work around, allowing any valid object to be used
@@ -27,6 +27,16 @@ class TiledJet:
     previous: "typing.Any" = None
     next: "typing.Any" = None
 
+    def isvalid(self):
+        return False if self.id == -1 else True
+    
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        if self.next:
+            return self.next
+        raise StopIteration
 
 @dataclass
 class TilingDef:
@@ -54,13 +64,15 @@ class Tiling:
 
     def __init__(self, setup: TilingDef):
         self.setup = setup
+        # self.tiled should store a list of TiledJet objects, which starts empty for now
         self.tiles = [
-            [TiledJet() for i in range(setup.n_tiles_phi)]
-            for j in range(setup.n_tiles_eta)
+            [ list() for i in range(setup.n_tiles_phi)] for j in range(setup.n_tiles_eta)
         ]
+        # TBD (2D?)
         self.positions = [
             [0 for i in range(setup.n_tiles_phi)] for j in range(setup.n_tiles_eta)
         ]
+        # TBD (2D?)
         self.tags = [
             [False for i in range(setup.n_tiles_phi)] for j in range(setup.n_tiles_eta)
         ]
