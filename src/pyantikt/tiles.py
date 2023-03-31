@@ -76,3 +76,39 @@ class Tiling:
         self.tags = [
             [False for i in range(setup.n_tiles_phi)] for j in range(setup.n_tiles_eta)
         ]
+
+def rightneighbours(row: int, column: int, setup: TilingDef) -> list[tuple[int, int]]:
+    '''Return all of the valid tile indexes to the right of the one at (row, column)
+        The neighbourhood of a tile is set up as follows
+
+	        LRR
+            LXR
+            LLR
+
+        Appropriate precautions are taken at the edges
+        Note that phi wraps round, but not eta
+    '''
+    rightneighbours = []
+    if row != 0:
+        rightneighbours.append((row-1, column))
+        if column != setup.n_tiles_phi-1:
+            rightneighbours.append((row-1, column+1))
+        else:
+            # Wrap around
+            rightneighbours.append((row-1, 0))
+    if column != setup.n_tiles_phi-1:
+        rightneighbours.append((row, column+1))
+    else:
+        rightneighbours.append((row, 0))
+    if row != setup.n_tiles_eta-1:
+        if column != setup.n_tiles_phi-1:
+            rightneighbours.append((row+1, column+1))
+        else:
+            # Wrap around
+            rightneighbours.append((row+1, 0))
+
+    print(f"Start: {row}, {column}")
+    for n in rightneighbours:
+        print(n)
+    return rightneighbours
+    

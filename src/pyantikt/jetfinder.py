@@ -1,7 +1,7 @@
 from copy import deepcopy
 from math import pi, floor, trunc
 from sys import float_info, exit
-from pyantikt.tiles import TilingDef, TiledJet, Tiling
+from pyantikt.tiles import TilingDef, TiledJet, Tiling, rightneighbours
 from pyantikt.history import HistoryElement, ClusterSequence
 
 
@@ -10,6 +10,12 @@ def tiledjet_dist(jetA: TiledJet, jetB: TiledJet):
     dphi = pi - abs(pi - abs(jetA.phi - jetB.phi))
     deta = jetA.eta - jetB.eta
     return dphi*dphi + deta*deta
+
+def tiledjet_diJ(jet):
+    kt2 = jet.kt2
+    if jet.NN and (jet.NN.kt2 < kt2):
+        kt2 = jet.NN.kt2
+    return jet.NN_dist * kt2
 
 
 def determine_rapidity_extent(particles):
@@ -280,8 +286,8 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
     print(len(tiledjets))
 
     # set up the initial nearest neighbour information
-    for tilerow in cs.tiling.tiles:
-        for tile in tilerow:
+    for itilerow, tilerow in enumerate(cs.tiling.tiles):
+        for itilecolumn, tile in enumerate(tilerow):
             # In our implementation tile is the list of TiledJets
             # so we can just iterate
             print(f"Start tile length {len(tile)}")
@@ -298,5 +304,40 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
                     if dist < jetB.NN_dist:
                         jetB.NN_dist = dist
                         jetB.NN = jetA
+
+            for rightindexes in rightneighbours(itilerow, itilecolumn, tiling.setup):
+                neighbourtile = cs.tiling.tiles[rightindexes[0]][rightindexes[1]]
+                for jetA in tile:
+                    for jetB in neighbourtile:
+                        dist = tiledjet_dist(jetA, jetB)
+                        print(dist)
+                        if (dist < jetA.NN_dist):
+                            jetA.NN_dist = dist
+                            jetA.NN = jetB
+                        if dist < jetB.NN_dist:
+                            jetB.NN_dist = dist
+                            jetB.NN = jetA
+
+    # Good checkpoint...
+    # Remember when comparing to Julia that our ids are 0 indexed, Julia is 1 indexed
+    for tilerow in cs.tiling.tiles:
+        for tile in tilerow:
+            for jet in tile:
+                print(f"{jet.id} {jet.eta} {jet.phi} -> {jet.NN_dist} {jet.NN.id if jet.NN else None}")
+    exit(0)
+
+    # now create the diJ (where J is i's NN) table -- remember that
+    # we differ from standard normalisation here by a factor of R2
+    # (corrected for at the end).
+    diJ = []
+    NNs = []
+    for itiledjet, tiledjet in enumerate(tiledjets):
+        jetA = tiledjet
+        diJ.append(tiledjet_diJ(tiledjet)) # kt distance * R^2
+        NNs.append(tiledjet)
+        tiledjet.diJ_posn = itiledjet   # one-to-one corresp. with non-compact jets,
+                                        # so set up bi-directional correspondence here
+
+    print(diJ)
 
     exit(0)
