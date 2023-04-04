@@ -1,4 +1,4 @@
-from math import atan2, pi, log
+from math import atan2, pi, log, sqrt
 
 
 # A few saftey factor constants
@@ -92,3 +92,23 @@ class PseudoJet:
     @property
     def inv_pt2(self):
         return self._inv_pt2
+
+    @property
+    def pt(self):
+        return sqrt(self._pt2)
+
+    @property
+    def cluster_hist_index(self):
+        return self._cluster_history_index
+
+    @cluster_hist_index.setter
+    def cluster_hist_index(self, cluster_history_index: int):
+        self._cluster_history_index = cluster_history_index
+
+    # Need to define the + operator on two jets
+    def __add__(self, jetB):
+        px = self._px + jetB.px
+        py = self._py + jetB.py
+        pz = self._pz + jetB.pz
+        E = self._E + jetB.E
+        return PseudoJet(px, py, pz, E)

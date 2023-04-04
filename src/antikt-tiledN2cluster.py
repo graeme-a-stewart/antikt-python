@@ -37,8 +37,11 @@ def main():
     logger.info(events[0][0])
 
     for event in events:
-        antikt_jet = faster_tiled_N2_cluster(event, Rparam=0.4, ptmin=0.0)
-
+        antikt_jets = faster_tiled_N2_cluster(event, Rparam=0.4, ptmin=5.0)
+        print(f"Found {len(antikt_jets)} jets")
+        for ijet, jet in enumerate(antikt_jets):
+            print(ijet, jet.rap, jet.phi, jet.pt)
+            
 
 if __name__ == "__main__":
     logger = logging.getLogger(Path(sys.argv[0]).name)
