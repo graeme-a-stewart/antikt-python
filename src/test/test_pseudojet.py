@@ -4,12 +4,13 @@ import unittest
 import vector
 from pyantikt.pseudojet import pseudojet
 
+
 class TestDerivedLorentzProperties(unittest.TestCase):
     def setUp(self):
-        px=0.22337332139323995
-        py=0.013200084794337135
-        pz=-0.18261482717845642
-        E=0.28882184483560597
+        px = 0.22337332139323995
+        py = 0.013200084794337135
+        pz = -0.18261482717845642
+        E = 0.28882184483560597
 
         self.vector_pseudojet = vector.obj(px=px, py=py, pz=pz, E=E)
 
@@ -23,6 +24,7 @@ class TestDerivedLorentzProperties(unittest.TestCase):
 
     def test_pt2(self):
         self.assertAlmostEqual(self.vector_pseudojet.pt2, self.pyjet_pesudojet.pt2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -161,7 +161,8 @@ def antikt_jet_finder(initial_particles, r=0.4):
 
     print(f"Found {len(final_jets)} jets")
     for njet, jet in enumerate(final_jets):
-        print(f"Jet {njet}: {jet.rapidity}, {jet.phi}, {jet.pt} ({jet})")
+        if jet.pt > 5.0:
+            print(f"Jet {njet}: {jet.rapidity}, {jet.phi}, {jet.pt} ({jet})")
 
 
 def main():
