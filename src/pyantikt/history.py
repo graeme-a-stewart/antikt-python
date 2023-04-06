@@ -54,8 +54,8 @@ class ClusterSequence:
     # vector to get the physical PseudoJet."""
     history: list[HistoryElement]
 
-    # PseudoJet tiling
-    tiling: Tiling
+    # PseudoJet tiling (only for the tiling algorithm)
+    tiling: Tiling | None
 
     # Total energy of the event
     Qtot: float = 0.0
