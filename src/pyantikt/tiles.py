@@ -75,14 +75,14 @@ class Tiling:
         self.tiles = [
             [list() for i in range(setup.n_tiles_phi)] for j in range(setup.n_tiles_eta)
         ]
-        # TBD
-        self.positions = [
-            [0 for i in range(setup.n_tiles_phi)] for j in range(setup.n_tiles_eta)
-        ]
-        # Tag tiles marked for an update (not needed if update is managed with a set())
-        self.tags = [
-            [False for i in range(setup.n_tiles_phi)] for j in range(setup.n_tiles_eta)
-        ]
+        # # TBD
+        # self.positions = [
+        #     [0 for i in range(setup.n_tiles_phi)] for j in range(setup.n_tiles_eta)
+        # ]
+        # # Tag tiles marked for an update (not needed if update is managed with a set())
+        # self.tags = [
+        #     [False for i in range(setup.n_tiles_phi)] for j in range(setup.n_tiles_eta)
+        # ]
 
 
 def rightneighbours(row: int, column: int, setup: TilingDef) -> list[tuple[int, int]]:

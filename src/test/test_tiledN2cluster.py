@@ -107,7 +107,7 @@ class TestJetOutputs(unittest.TestCase):
                     )
                     # There is something odd about the fastjet output, where rapidity is
                     # somehow screwed up in the outputs for jets beyond the 3rd,
-                    # however, pt match is good, so I think it's not a real issue
+                    # however, pt match is good, so I think it's not a "real" issue
                     #
                     # This is also why the FastJet test is separate ATM from the Julia one...
                     #

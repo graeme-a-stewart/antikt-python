@@ -2,12 +2,10 @@
 """Anti-Kt jet finder, Tiled N^2 version"""
 
 import argparse
-import numpy as np
-import vector
 import sys
+import time
 import logging
 
-from copy import deepcopy
 from pathlib import Path
 
 from pyantikt.hepmc import read_jet_particles
@@ -34,18 +32,21 @@ def main():
         logger.setLevel(logging.DEBUG)
 
     events = read_jet_particles(file=args.eventfile, skip=args.skip, nevents=args.maxevents)
-    logger.info(events[0][0])
+    # logger.info(events[0][0])
 
-    for event in events:
+    start = time.monotonic_ns()/1000.0
+    for ievt, event in enumerate(events, start=1):
         antikt_jets = faster_tiled_N2_cluster(event, Rparam=0.4, ptmin=5.0)
-        print(f"Found {len(antikt_jets)} jets")
+        logger.info(f"Event {ievt}, found {len(antikt_jets)} jets")
         for ijet, jet in enumerate(antikt_jets):
-            print(ijet, jet.rap, jet.phi, jet.pt)
-            
+            logger.debug(f"{ijet}, {jet.rap}, {jet.phi}, {jet.pt}")
+    end = time.monotonic_ns()/1000.0
+    print(f"Processed {len(events)} events in {end-start} us")
+    print(f"Time per event: {(end-start)/len(events)} us")
 
 if __name__ == "__main__":
     logger = logging.getLogger(Path(sys.argv[0]).name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.WARN)
 
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
