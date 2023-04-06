@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 
 from pyantikt.hepmc import read_jet_particles
-from pyantikt.jetfinder import faster_tiled_N2_cluster
+from pyantikt.tiledjetfinder import faster_tiled_N2_cluster
 
 def main():
     parser = argparse.ArgumentParser(description="Tiled N^2 AntiKt Jet Finder")
@@ -32,9 +32,8 @@ def main():
         logger.setLevel(logging.DEBUG)
 
     events = read_jet_particles(file=args.eventfile, skip=args.skip, nevents=args.maxevents)
-    # logger.info(events[0][0])
 
-    start = time.monotonic_ns()/1000.0
+    start = time.monotonic_ns()/1000.0 # microseconds
     for ievt, event in enumerate(events, start=1):
         antikt_jets = faster_tiled_N2_cluster(event, Rparam=0.4, ptmin=5.0)
         logger.info(f"Event {ievt}, found {len(antikt_jets)} jets")

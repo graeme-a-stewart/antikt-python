@@ -59,3 +59,25 @@ class ClusterSequence:
 
     # Total energy of the event
     Qtot: float = 0.0
+
+
+def initial_history(particles):
+    """Initialise the clustering history in a standard way,
+    Takes as input the list of stable particles as input
+    Returns the history and the total event energy."""
+
+    # This is going to be a list of HistoryElements
+    history = []
+    Qtot = 0.0
+
+    for i, _ in enumerate(particles):
+        # Add in order, so that HistoryElement[i] -> particle[i]
+        history.append(HistoryElement(jetp_index=i))
+
+        # get cross-referencing right from PseudoJets
+        particles[i].cluster_hist_index = i
+
+        # determine the total energy in the event
+        Qtot += particles[i].E
+
+    return history, Qtot

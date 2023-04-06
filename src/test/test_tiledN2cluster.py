@@ -7,7 +7,7 @@ import time
 from pprint import pprint
 
 from pyantikt.hepmc import read_jet_particles
-from pyantikt.jetfinder import faster_tiled_N2_cluster
+from pyantikt.tiledjetfinder import faster_tiled_N2_cluster
 
 def find_python_jets(nevents: int):
     '''Separate our jet finding to avoid running multiple times'''
