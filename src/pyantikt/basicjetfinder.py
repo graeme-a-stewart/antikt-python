@@ -62,8 +62,10 @@ def scan_for_all_nearest_neighbours(jets: list[PseudoJet]):
         jetA.info.akt_dist = antikt_distance(jetA, jets[jetA.info.nn] if jetA.info.nn else None)
 
 
-def scan_for_my_nearest_neighbours(jetA: PseudoJet, jets: list[PseudoJet]):
+def scan_for_my_nearest_neighbours(jetA: PseudoJet, jets: list[PseudoJet], R2: float):
     '''Retest all other jets against the target jet'''
+    jetA.info.nn = None
+    jetA.info.nn_dist = R2
     for ijetB, jetB in enumerate(jets):
         if not jetB.info.active:
             continue
@@ -83,13 +85,48 @@ def test_for_nearest_neighbour(jetA: PseudoJet, jetB: PseudoJet):
     dist = geometric_distance(jetA, jetB)
     if dist < jetA.info.nn_dist:
         jetA.info.nn_dist = dist
-        jetA.info.nn = jetB.info.nn
+        jetA.info.nn = jetB.info.id
         jetA.info.akt_dist = antikt_distance(jetA, jetB)
     if dist < jetB.info.nn_dist:
         jetB.info.nn_dist = dist
         jetB.info.nn = jetA.info.id
         jetB.info.akt_dist = antikt_distance(jetB, jetA)
 
+
+def add_step_to_history(history, jets, parent1, parent2, jetp_index, distance):
+    max_dij_so_far = max(distance, history[-1].max_dij_so_far)
+
+    history.append(HistoryElement(parent1=parent1, parent2=parent2,
+                                    jetp_index=jetp_index, dij=distance,
+                                    max_dij_so_far=max_dij_so_far))
+    local_step = len(history) - 1
+    # print(f"Added history step {local_step}: {history[-1]}")
+
+    if parent1 >= 0:
+        # print(f"History of {parent1}: {cs.history[parent1]}")
+        if history[parent1].child != -1:
+            # print(history[parent1])
+            raise (
+                RuntimeError(
+                    f"Internal error. Trying to recombine a parent1 object that has previsously been recombined: {parent1}"
+                )
+            )
+    history[parent1].child = local_step
+
+    if parent2 >= 0:
+        # print(f"History of {parent2}: {cs.history[parent2]}")
+        if history[parent2].child != -1:
+            # print(history[parent2])
+            raise (
+                RuntimeError(
+                    f"Internal error. Trying to recombine a parent1 object that has previsously been recombined: {parent2}"
+                )
+            )
+    history[parent2].child = local_step
+
+    # get cross-referencing right from PseudoJets
+    if jetp_index >= 0:
+        jets[jetp_index].cluster_hist_index = local_step
 
 def inclusive_jets(jets: list[PseudoJet], history: list[HistoryElement], ptmin:float=0.0):
     """return all inclusive jets of a ClusterSequence with pt > ptmin"""
@@ -120,7 +157,7 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
         jet.info = BasicJetInfo(id = ijet, nn_dist=R2)
     # print(history, Qtot)
 
-    cs = ClusterSequence(jets, history, None, Qtot)
+    # cs = ClusterSequence(jets, history, None, Qtot)
 
     # Setup the nearest neighbours, which is an expensive
     # initial operation (N^2 scaling here)
@@ -134,45 +171,47 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
 
         # Add normalisation for real distance
         distance *= invR2
-        # print(f"Iteration {iteration}: {distance} for jet {jetA.info.id} and jet {jetA.info.nn}")
+        # print(f"Iteration {iteration+1}: {distance} for jet {jetA.info.id} and jet {jetA.info.nn}")
         jetB = jets[jetA.info.nn] if jetA.info.nn else None
 
         if (jetB):
+            if jetB.info.id < jetA.info.id:
+                jetA, jetB = jetB, jetA
+
             # Merge jets
             jetA.info.active = jetB.info.active = False
             merged_jet = jetA + jetB
             merged_jet.info = BasicJetInfo(id = len(jets), nn_dist=R2)
             jets.append(merged_jet)
-            scan_for_my_nearest_neighbours(jets[-1], jets)
 
-            history.append(HistoryElement(parent1=jetA.info.id, parent2=jetB.info.id,
-                                          jetp_index=merged_jet.info.id, dij=distance,
-                                          max_dij_so_far=distance if history[-1].max_dij_so_far < distance else history[-1].max_dij_so_far))
-            # print(history[-1], jets[-1])
+            add_step_to_history(history=history, jets=jets, 
+                                parent1=jetA.cluster_hist_index,
+                                parent2=jetB.cluster_hist_index,
+                                jetp_index=merged_jet.info.id, distance=distance)
+            
+            # Get the NNs for the merged pseudojet
+            scan_for_my_nearest_neighbours(jets[-1], jets, R2)
         
         else:
             # Beamjet
             jetA.info.active = False
-            history.append(HistoryElement(parent1=jetA.info.id, parent2=BeamJet, jetp_index=-1, dij=distance,
-                                          max_dij_so_far=distance if history[-1].max_dij_so_far < distance else history[-1].max_dij_so_far))
-            # print(history[-1])
+            add_step_to_history(history=history, jets=jets, parent1=jetA.cluster_hist_index, parent2=BeamJet, 
+                                jetp_index=Invalid, distance=distance)
 
         # Now need to update nearest distances
         for jet in jets:
             if jet.info.active:
-                # If a jet had A or B as an NN, this is now invalid - scan all remaining jets
+                # If a jet had jetA or JetB as NN, this is invalid now - rescan the active jets
                 # If a jet had None as NN, test against the new jet
                 # If a jet had an NN, but not A or B, test against the new jet
                 if jet.info.nn == jetA.info.id:
-                    jet.info.nn_dist = R2
-                    jet.info.nn = None
-                    scan_for_my_nearest_neighbours(jet, jets)
+                    scan_for_my_nearest_neighbours(jet, jets, R2)
                 elif jetB and jet.info.nn == jetB.info.id:
-                    jet.info.nn_dist = R2
-                    jet.info.nn = None
-                    scan_for_my_nearest_neighbours(jet, jets)
+                    scan_for_my_nearest_neighbours(jet, jets, R2)
                 elif jetB:
                     test_for_nearest_neighbour(jet, jets[-1])
+                # if jet.info.id == jet.info.nn:
+                #     raise RuntimeError(f"Bad juju for jet {jet.info.id} - I am my own NN")
 
     for jet in jets:
         if jet.info.active:

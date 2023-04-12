@@ -35,6 +35,7 @@ def main():
 
     start = time.monotonic_ns()/1000.0 # microseconds
     for ievt, event in enumerate(events, start=1):
+        logger.info(f"Event {ievt} has {len(event)} particles")
         antikt_jets = faster_tiled_N2_cluster(event, Rparam=0.4, ptmin=5.0)
         logger.info(f"Event {ievt}, found {len(antikt_jets)} jets")
         for ijet, jet in enumerate(antikt_jets):

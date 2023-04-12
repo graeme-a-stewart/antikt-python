@@ -556,6 +556,7 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
 
         # Renormalise
         diJ_min *= invR2
+        # print(f"Iteration {loop_counter}: {diJ_min} for jet {jetA.id} and jet {jetB.id if jetA.NN else None}")
 
         if jetB:
             # jet-jet recombination
