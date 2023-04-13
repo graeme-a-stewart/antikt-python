@@ -9,11 +9,12 @@ from pprint import pprint
 from pyantikt.hepmc import read_jet_particles
 from pyantikt.tiledjetfinder import faster_tiled_N2_cluster
 
+
 def find_python_jets(nevents: int):
-    '''Separate our jet finding to avoid running multiple times'''
+    """Separate our jet finding to avoid running multiple times"""
     # Read events from HEPMC file and find our jets
     events = read_jet_particles(
-        "../data/events.hepmc3/events.hepmc3",
+        "../data/events.hepmc3",
         skip=0,
         nevents=nevents,
     )
@@ -29,10 +30,12 @@ def find_python_jets(nevents: int):
 
     return my_jets
 
+
 def get_reference_jets(source_file):
     # Read reference jet outputs
     with open(source_file) as refjets:
         return json.load(refjets)
+
 
 class TestJetOutputs(unittest.TestCase):
     # Set these up as class variables, so they are only initialised once
@@ -43,10 +46,13 @@ class TestJetOutputs(unittest.TestCase):
     # As our jet finding is expensive, only do this once
     @classmethod
     def setUpClass(self) -> None:
-        self.reference_jets_fastjet = get_reference_jets("../data/jet_collections_fastjet.json")
-        self.reference_jets_julia = get_reference_jets("../data/jet_collections_julia.json")
+        self.reference_jets_fastjet = get_reference_jets(
+            "../data/jet_collections_fastjet.json"
+        )
+        self.reference_jets_julia = get_reference_jets(
+            "../data/jet_collections_julia.json"
+        )
         self.my_jets = find_python_jets(len(self.reference_jets_fastjet))
-
 
     def test_jet_outputs_julia(self):
         for ievt, (ref_evt, my_evt) in enumerate(
@@ -121,6 +127,7 @@ class TestJetOutputs(unittest.TestCase):
                     #     my_jet["phi"],
                     #     msg=f"phi does not match for event {ievt}, sorted jet {ijet}",
                     # )
+
 
 if __name__ == "__main__":
     unittest.main()

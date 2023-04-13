@@ -11,6 +11,9 @@ from pyantikt.tiles import (
 )
 from pyantikt.history import HistoryElement, ClusterSequence, initial_history
 
+import logging
+logger = logging.getLogger(__name__)
+
 Invalid = -3
 NonexistentParent = -2
 BeamJet = -1
@@ -65,8 +68,6 @@ def determine_rapidity_extent(particles):
         ibin = max(0, min(nbins - 1, trunc(y + nrap)))
         counts[ibin] += 1
 
-    # print(minrap, maxrap, counts)
-
     # now figure out the particle count in the busiest bin
     max_in_bin = max(counts)
 
@@ -98,16 +99,13 @@ def determine_rapidity_extent(particles):
         cumul_lo += counts[ibin_lo]
         if cumul_lo >= allowed_max_cumul:
             minrap = max(minrap, ibin_lo - nrap)
-            # print(minrap, ibin_lo - nrap)
             break
-        # print(cumul_lo, ibin_lo)
         ibin_lo += 1
     if ibin_lo == nbins:
         raise RuntimeError(
             "Failed to find a low bin"
         )  # internal consistency check that you found a bin
     cumul2 += cumul_lo**2
-    # print("c2 lo", cumul2)
 
     # then do it from right, to find out maximum rapidity of tiling
     cumul_hi = 0.0
@@ -117,7 +115,6 @@ def determine_rapidity_extent(particles):
         if cumul_hi >= allowed_max_cumul:
             maxrap = min(maxrap, ibin_hi - nrap + 1)
             break
-        # print(cumul_hi, ibin_hi)
         ibin_hi -= 1
     if ibin_hi == -1:
         raise RuntimeError(
@@ -142,14 +139,10 @@ def determine_rapidity_extent(particles):
         # otherwise we have a straightforward sum of squares of bin
         # contents
         cumul2 += cumul_hi**2
-        # print("c2 hi", cumul2)
 
     # now get the rest of the squared bin contents
     for ibin in range(ibin_lo + 1, ibin_hi + 1):
         cumul2 += counts[ibin] ** 2
-        # print(ibin, cumul2)
-
-    # print(minrap, maxrap, ibin_lo, ibin_hi, cumul2)
 
     return minrap, maxrap
 
@@ -191,7 +184,6 @@ def initial_tiling(particles, Rparam=0.4):
     )
 
     # allocate the tiles
-    # print(f"Tiling is {n_tiles_eta} x {n_tiles_phi} in eta, phi")
     return Tiling(tiling_setup)
 
 
@@ -199,15 +191,10 @@ def tiledjet_remove_from_tiles(tiling, jet):
     """Remove a jet from a tiling"""
     tile_indices = jet.tile_index
 
-    # print(jet.id, tile_indices)
-    # print(len(tiling.tiles[tile_indices[0]][tile_indices[1]]))
     # Now we need to find where the jet is in the tiled list (which is not cached)
     tile_jet_position = -1
     for ijet, tile_jet in enumerate(tiling.tiles[tile_indices[0]][tile_indices[1]]):
         # previous and next are references to the actual tiled jets, None if there is nothing
-        # print(
-        #     f"{ijet}: {tile_jet.id} {tile_jet.previous.id if tile_jet.previous else None} {tile_jet.next.id if tile_jet.next else None}"
-        # )
         if jet.id == tile_jet.id:
             tile_jet_position = ijet
             break
@@ -244,15 +231,6 @@ def tiledjet_remove_from_tiles(tiling, jet):
         jet.next = jet.previous = None
         del tiling.tiles[tile_indices[0]][tile_indices[1]][tile_jet_position]
 
-    # print("After deletion:")
-    # for ijet, tile_jet in enumerate(tiling.tiles[tile_indices[0]][tile_indices[1]]):
-    #     # previous and next are references to the actual tiled jets, None if there is nothing
-    #     print(
-    #         f"{ijet}: {tile_jet.id} {tile_jet.previous.id if tile_jet.previous else None} {tile_jet.next.id if tile_jet.next else None}"
-    #     )
-
-    # exit(0)
-
 
 # ----------------------------------------------------------------------
 # initialise the history in a standard way
@@ -270,7 +248,7 @@ def add_step_to_history(cs, parent1, parent2, jetp_index, dij):
     )
 
     local_step = len(cs.history) - 1
-    # print(f"Added history step {local_step}: {cs.history[-1]}")
+    logger.debug(f"Added history step {local_step}: {cs.history[-1]}")
 
     ##ifndef __NO_ASSERTS__
     # assert(local_step == step_number);
@@ -284,7 +262,6 @@ def add_step_to_history(cs, parent1, parent2, jetp_index, dij):
     # retry the clustering with a different strategy.
 
     if parent1 >= 0:
-        # print(f"History of {parent1}: {cs.history[parent1]}")
         if cs.history[parent1].child != -1:
             raise (
                 RuntimeError(
@@ -294,7 +271,6 @@ def add_step_to_history(cs, parent1, parent2, jetp_index, dij):
     cs.history[parent1].child = local_step
 
     if parent2 >= 0:
-        # print(f"History of {parent2}: {cs.history[parent2]}")
         if cs.history[parent2].child != -1:
             raise (
                 RuntimeError(
@@ -333,7 +309,6 @@ def get_tile_indexes(tiling_setup, eta, phi):
     # iphi = mod(unsafe_trunc(Int, (phi + 2π) / tiling_setup._tile_size_phi),
     #           tiling_setup._n_tiles_phi)
     iphi = int(phi * tiling_setup.n_tiles_phi / (2.0 * pi))
-    # print(ieta, iphi, map_indices_to_julia(tiling_setup, ieta, iphi))
     return ieta, iphi
 
 
@@ -342,7 +317,6 @@ def tiledjet_set_jetinfo(jet, cs, jets_index, R2):
     # Note that tile_indexes is a tuple here, indexing into
     # the Python list of lists
     tile_indexes = get_tile_indexes(cs.tiling.setup, jet.rap, jet.phi)
-    # print(f"Tiled jet {jets_index}: {tile_indexes}")
     tiled_jet = TiledJet(
         id=jets_index,
         eta=jet.rap,
@@ -357,7 +331,6 @@ def tiledjet_set_jetinfo(jet, cs, jets_index, R2):
         # Do we need this...?
         tiled_jet.previous = cs.tiling.tiles[tile_indexes[0]][tile_indexes[1]][-2]
         cs.tiling.tiles[tile_indexes[0]][tile_indexes[1]][-2].next = tiled_jet
-    # print(f"Tile length: {len(cs.tiling.tiles[tile_indexes[0]][tile_indexes[1]])}")
     return tiled_jet
 
 
@@ -447,19 +420,12 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
     # Create a container of PseudoJet objects
     history, Qtot = initial_history(initial_particles)
     jets = deepcopy(initial_particles)
-    # print(history, Qtot)
 
     # Note that this tiling is filled with blanks - there are no
     # real particles here
     tiling = initial_tiling(initial_particles, Rparam)
-    # print(tiling)
 
     cs = ClusterSequence(jets, history, tiling, Qtot)
-    # print(cs.tiling.tiles)
-    # print(len(cs.tiling.tiles))
-    # for slice in cs.tiling.tiles:
-    #     print(len(slice))
-    # exit(0)
 
     # Not sure we need this - it's a caching object the original code
     tile_union = []
@@ -468,24 +434,17 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
     tiledjets = []
     for ijet, jet in enumerate(jets):
         tiledjets.append(tiledjet_set_jetinfo(jet, cs, ijet, R2))
-        # print(ijet, tiledjets[-1])
-    # exit(0)
-
-    # print(f"Initial number of pseudojets: {len(tiledjets)}")
 
     # set up the initial nearest neighbour information
     for itilerow, tilerow in enumerate(cs.tiling.tiles):
         for itilecolumn, tile in enumerate(tilerow):
             # In our implementation tile is the list of TiledJets
             # so we can just iterate
-            # print(f"Tile ({itilerow} {itilecolumn}); tile length {len(tile)}")
             for ijetA, jetA in enumerate(tile, start=1):
                 for ijetB, jetB in enumerate(tile[ijetA:], start=ijetA):
-                    # print(f"A, B: {ijetA-1}, {ijetB}")
                     if jetB == jetA:
                         break
                     dist = tiledjet_dist(jetA, jetB)
-                    # print(dist)
                     if dist < jetA.NN_dist:
                         jetA.NN_dist = dist
                         jetA.NN = jetB
@@ -498,7 +457,6 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
                 for jetA in tile:
                     for jetB in neighbourtile:
                         dist = tiledjet_dist(jetA, jetB)
-                        # print(dist)
                         if dist < jetA.NN_dist:
                             jetA.NN_dist = dist
                             jetA.NN = jetB
@@ -506,57 +464,25 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
                             jetB.NN_dist = dist
                             jetB.NN = jetA
 
-    # Good checkpoint...
-    # Remember when comparing to Julia that our ids are 0 indexed, Julia is 1 indexed
-    # for tilerow in cs.tiling.tiles:
-    #     for tile in tilerow:
-    #         for jet in tile:
-    #             print(
-    #                 f"{jet.id} {jet.eta} {jet.phi} -> {jet.NN_dist} {jet.NN.id if jet.NN else None}"
-    #             )
-    # exit(0)
-
     for tiledjet in tiledjets:
         tiledjet.diJ_dist = tiledjet_diJ(tiledjet)
-
-    # # now create the diJ (where J is i's NN) table -- remember that
-    # # we differ from standard normalisation here by a factor of R2
-    # # (corrected for at the end).
-
-    # diJ = []
-    # NNs = []
-    # for itiledjet, tiledjet in enumerate(tiledjets):
-    #     # jetA = tiledjet
-    #     diJ.append(tiledjet_diJ(tiledjet))  # kt distance * R^2
-    #     NNs.append(tiledjet)
-    #     tiledjet.diJ_posn = itiledjet  # one-to-one corresp. with non-compact jets,
-    #     # so set up bi-directional correspondence here
-
-    # print(diJ)
-    # print(NNs)
 
     # Now run the recombination loop
     history_location = len(cs.jets)
     n = len(cs.jets)
     loop_counter = 0
     while n > 0:
-        # diJ_min, best = find_best(diJ, n)
         diJ_min, best, active_jets = find_best_tiledjet(tiledjets)
-        # print(
-        #     f"Loop {loop_counter}: {diJ_min}, {best}, {n}. Active jets: {active_jets}"
-        # )
         loop_counter += 1
         history_location += 1
         n -= 1
 
         jetA = tiledjets[best]
         jetB = jetA.NN
-        # print(f"A::{jetA.id} B::{jetB.id if jetA.NN else None}")
-        # exit(0)
 
         # Renormalise
         diJ_min *= invR2
-        # print(f"Iteration {loop_counter}: {diJ_min} for jet {jetA.id} and jet {jetB.id if jetA.NN else None}")
+        logger.debug(f"Iteration {loop_counter}: {diJ_min} for jet {jetA.id} and jet {jetB.id if jetA.NN else None}")
 
         if jetB:
             # jet-jet recombination
@@ -571,7 +497,6 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
             newPseudoJet, nn = do_ij_recombination_step(
                 cs, jetA.jet_index, jetB.jet_index, diJ_min
             )
-            # print(f"Merged A::{jetA.id} and B::{jetB.id} to {nn}")
 
             tiledjet_remove_from_tiles(cs.tiling, jetA)
             jetA.active = False
@@ -579,11 +504,9 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
             jetB.active = False
             newTiledJet = tiledjet_set_jetinfo(newPseudoJet, cs, nn, R2)
             tiledjets.append(newTiledJet)
-            # print(len(tiledjets))
         else:
             # jet-beam recombination
             # get the hist_index
-            # print(f"Merged A::{jetA.id} with beam")
             do_iB_recombination_step(cs, jetA.jet_index, diJ_min)
             tiledjet_remove_from_tiles(cs.tiling, jetA)
             jetA.active = False
@@ -595,7 +518,6 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
         tile_union = (
             set()
         )  # Set means we don't need to worry about things being double entered
-        # print(f"{jetA.tile_index} - {jetB.tile_index if jetA.NN else None} - {newTiledJet.tile_index}")
         add_untagged_neighbours_to_tile_union(jetA.tile_index, tile_union, tiling)
         if jetB and jetB.tile_index != jetA.tile_index:
             add_untagged_neighbours_to_tile_union(jetB.tile_index, tile_union, tiling)
@@ -606,21 +528,6 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
                 newTiledJet.tile_index, tile_union, tiling
             )
 
-        # print(f"Neighbour tiles: {tile_union}")
-
-        # # Compactify the diJ by taking the last of the diJ and copying
-        # # it to the position occupied by the diJ for jetA
-        # # print(diJ)
-        # NNs[n-1].diJ_posn = jetA.diJ_posn
-        # diJ[jetA.diJ_posn] = diJ[n-1]
-        # NNs[jetA.diJ_posn] = NNs[n-1]
-        # # then reduce size of table
-        # del diJ[-1]
-        # del NNs[-1]
-        # n -= 1
-        # # print(diJ)
-        # # exit(0)
-
         # Initialise jetB's NN distance as well as updating it for other particles.
         # Run over all tiles in our union
         for tile_index in tile_union:
@@ -630,13 +537,8 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
                 print(f"{tile_index} caused {e}")
                 exit(1)
 
-            # @inbounds tile = tiling.tiles[ @inbounds tile_union[itile]] #TAKES 5μs
-            # @inbounds tiling.tags[tile_union[itile]] = false # reset tag, since we're done with unions
-            # isvalid(tile) || continue #Probably not required
-
             # run over all jets in the current tile
             for jetI in tile:
-                # print(f"Update NNs for jet {jetI.id} (current NN: {jetI.NN.id if jetI.NN else None})")
                 # see if jetI had jetA or jetB as a NN -- if so recalculate the NN
                 if (jetI.NN == jetA) or (jetI.NN == jetB):
                     # print("Strike!")
@@ -645,20 +547,15 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
 
                     # now go over tiles that are neighbours of this jet (include own tile)
                     for near_tile_index in surrounding_tiles(tile_index, tiling):
-                        # print(f"Testing {near_tile_index}")
                         # and then over the contents of that tile
                         for jetJ in tiling.tiles[near_tile_index[0]][
                             near_tile_index[1]
                         ]:
                             dist = tiledjet_dist(jetI, jetJ)
-                            # print(f"distance to {jetJ.id} is {dist}")
                             if (dist < jetI.NN_dist) and (jetJ.id != jetI.id):
-                                # print("*** Strike 2")
                                 jetI.NN_dist = dist
                                 jetI.NN = jetJ
                     jetI.diJ_dist = tiledjet_diJ(jetI)
-                    # diJ[jetI.diJ_posn] = tiledjet_diJ(jetI)  # update diJ kt-dist
-                    # print(f"diJ: {jetI.diJ_posn} now {diJ[jetI.diJ_posn]}")
 
                 # check whether new newTiledJet is closer than jetI's current NN and
                 # if jetI is closer than newTiledJet's current (evolving) nearest
@@ -670,13 +567,10 @@ def faster_tiled_N2_cluster(initial_particles, Rparam=0.4, ptmin=0.0):
                             jetI.NN_dist = dist
                             jetI.NN = newTiledJet
                             jetI.diJ_dist = tiledjet_diJ(jetI)
-                            # diJ[jetI.diJ_posn] = tiledjet_diJ(jetI)  # update diJ...
                     if (dist < newTiledJet.NN_dist) and (jetI != newTiledJet):
                         newTiledJet.NN_dist = dist
                         newTiledJet.NN = jetI
         if newTiledJet.isvalid():
             newTiledJet.diJ_dist = tiledjet_diJ(newTiledJet)
-            # diJ[newTiledJet.diJ_posn] = tiledjet_diJ(newTiledJet)
 
-        # exit(0)
     return inclusive_jets(cs, ptmin)
