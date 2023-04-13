@@ -6,6 +6,10 @@ from pyantikt.history import HistoryElement, ClusterSequence, initial_history
 from pyantikt.pseudojet import PseudoJet
 from sys import float_info
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 Invalid = -3
 NonexistentParent = -2
 BeamJet = -1
@@ -100,12 +104,10 @@ def add_step_to_history(history, jets, parent1, parent2, jetp_index, distance):
                                     jetp_index=jetp_index, dij=distance,
                                     max_dij_so_far=max_dij_so_far))
     local_step = len(history) - 1
-    # print(f"Added history step {local_step}: {history[-1]}")
+    logger.debug(f"Added history step {local_step}: {history[-1]}")
 
     if parent1 >= 0:
-        # print(f"History of {parent1}: {cs.history[parent1]}")
         if history[parent1].child != -1:
-            # print(history[parent1])
             raise (
                 RuntimeError(
                     f"Internal error. Trying to recombine a parent1 object that has previsously been recombined: {parent1}"
@@ -114,9 +116,7 @@ def add_step_to_history(history, jets, parent1, parent2, jetp_index, distance):
     history[parent1].child = local_step
 
     if parent2 >= 0:
-        # print(f"History of {parent2}: {cs.history[parent2]}")
         if history[parent2].child != -1:
-            # print(history[parent2])
             raise (
                 RuntimeError(
                     f"Internal error. Trying to recombine a parent1 object that has previsously been recombined: {parent2}"
@@ -155,9 +155,6 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
     jets = deepcopy(initial_particles)
     for ijet, jet in enumerate(jets):
         jet.info = BasicJetInfo(id = ijet, nn_dist=R2)
-    # print(history, Qtot)
-
-    # cs = ClusterSequence(jets, history, None, Qtot)
 
     # Setup the nearest neighbours, which is an expensive
     # initial operation (N^2 scaling here)
@@ -171,8 +168,8 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
 
         # Add normalisation for real distance
         distance *= invR2
-        # print(f"Iteration {iteration+1}: {distance} for jet {jetA.info.id} and jet {jetA.info.nn}")
-        jetB = jets[jetA.info.nn] if jetA.info.nn else None
+        logger.debug(f"Iteration {iteration+1}: {distance} for jet {jetA.info.id} and jet {jetA.info.nn}")
+        jetB = jets[jetA.info.nn] if (jetA.info.nn != None) else None
 
         if (jetB):
             if jetB.info.id < jetA.info.id:
@@ -210,8 +207,6 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
                     scan_for_my_nearest_neighbours(jet, jets, R2)
                 elif jetB:
                     test_for_nearest_neighbour(jet, jets[-1])
-                # if jet.info.id == jet.info.nn:
-                #     raise RuntimeError(f"Bad juju for jet {jet.info.id} - I am my own NN")
 
     for jet in jets:
         if jet.info.active:
