@@ -11,6 +11,8 @@ from pathlib import Path
 from pyantikt.hepmc import read_jet_particles
 from pyantikt.basicjetfinder import basicjetfinder
 from pyantikt.benchmark import Benchmark
+from pyantikt.acceleratedbasicjetfinder import basicjetfinder
+#from pyantikt.basicjetfinder import basicjetfinder
 
 
 def main():
