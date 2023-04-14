@@ -1,0 +1,331 @@
+Project dir: /home/graemes/code/AntiKt.jl
+======================================================================
+| C++                                                                |
+======================================================================
+
+Run 100 times the C++ version of the code.
+make: Entering directory '/home/graemes/code/AntiKt.jl/antiktcxx'
+make: 'antikt' is up to date.
+make: Leaving directory '/home/graemes/code/AntiKt.jl/antiktcxx'
+Read event number 1
+Read event number 2
+Read event number 3
+Read event number 4
+Read event number 5
+Read event number 6
+Read event number 7
+Read event number 8
+Read event number 9
+Read event number 10
+Read event number 11
+Read event number 12
+Read event number 13
+Read event number 14
+Read event number 15
+Read event number 16
+Read event number 17
+Read event number 18
+Read event number 19
+Read event number 20
+Read event number 21
+Read event number 22
+Read event number 23
+Read event number 24
+Read event number 25
+Read event number 26
+Read event number 27
+Read event number 28
+Read event number 29
+Read event number 30
+Read event number 31
+Read event number 32
+Read event number 33
+Read event number 34
+Read event number 35
+Read event number 36
+Read event number 37
+Read event number 38
+Read event number 39
+Read event number 40
+Read event number 41
+Read event number 42
+Read event number 43
+Read event number 44
+Read event number 45
+Read event number 46
+Read event number 47
+Read event number 48
+Read event number 49
+Read event number 50
+Read event number 51
+Read event number 52
+Read event number 53
+Read event number 54
+Read event number 55
+Read event number 56
+Read event number 57
+Read event number 58
+Read event number 59
+Read event number 60
+Read event number 61
+Read event number 62
+Read event number 63
+Read event number 64
+Read event number 65
+Read event number 66
+Read event number 67
+Read event number 68
+Read event number 69
+Read event number 70
+Read event number 71
+Read event number 72
+Read event number 73
+Read event number 74
+Read event number 75
+Read event number 76
+Read event number 77
+Read event number 78
+Read event number 79
+Read event number 80
+Read event number 81
+Read event number 82
+Read event number 83
+Read event number 84
+Read event number 85
+Read event number 86
+Read event number 87
+Read event number 88
+Read event number 89
+Read event number 90
+Read event number 91
+Read event number 92
+Read event number 93
+Read event number 94
+Read event number 95
+Read event number 96
+Read event number 97
+Read event number 98
+Read event number 99
+Read event number 100
+Time to read 100 event(s): 548.821ms
+
+Jets in the first processed event:
+jet #        rapidity             phi              pt
+    0      1.36876323      6.15824888      8.95819427
+    1     -2.18503736      5.30438152     19.89959594
+    2      3.35635648      2.68836383     24.83429978
+
+1 28029
+2 25735
+3 25211
+4 24261
+5 24383
+6 30467
+7 34091
+8 26119
+9 24261
+10 24129
+11 24696
+12 24765
+13 24325
+14 24442
+15 24324
+16 30170
+17 27151
+18 24405
+19 24680
+20 25242
+21 25023
+22 24407
+23 24242
+24 24965
+25 24331
+26 24406
+27 24438
+28 24715
+29 25024
+30 24618
+31 24792
+32 24944
+33 24737
+34 24203
+35 24217
+36 24382
+37 24504
+38 24454
+39 25622
+40 24272
+41 24286
+42 24439
+43 24310
+44 24380
+45 24219
+46 25468
+47 24475
+48 25268
+49 24274
+50 24106
+51 24202
+52 24192
+53 24555
+54 24324
+55 24391
+56 34185
+57 25550
+58 24370
+59 28957
+60 24543
+61 25004
+62 24798
+63 24994
+64 24269
+65 24630
+66 33645
+67 24368
+68 27570
+69 27078
+70 26920
+71 28658
+72 24400
+73 25011
+74 25101
+75 29399
+76 25180
+77 24454
+78 26236
+79 29613
+80 29007
+81 24416
+82 24793
+83 27876
+84 24672
+85 25377
+86 24607
+87 24316
+88 24714
+89 24469
+90 24536
+91 24740
+92 24299
+93 24541
+94 24367
+95 24542
+96 24081
+97 24290
+98 24416
+99 24378
+100 24655
+Duration per event: 254.703 us
+Per event: 254.21 +- 20.752
+Number of processed events: 100
+Sum of jet multiplicity over the events and processing loops: 772
+
+======================================================================
+| Julia                                                               |
+======================================================================
+
+Run 100 times the Julia version of the code.
+1 37216.74
+2 33172.65
+3 30888.472
+4 30271.12
+5 31997.913
+6 30054.915
+7 40564.862
+8 30533.06
+9 31059.408
+10 33012.372
+11 30454.49
+12 30860.525
+13 34328.449
+14 33571.269
+15 36405.553
+16 30754.308
+17 31087.186
+18 31680.496
+19 33132.433
+20 31918.04
+21 30727.936
+22 30623.593
+23 35617.689
+24 32003.663
+25 31962.68
+26 31001.211
+27 32725.941
+28 30979.688000000002
+29 30315.309
+30 32414.086
+31 31156.009000000002
+32 32580.903000000002
+33 31755.625
+34 30830.007
+35 38910.953
+36 30737.521
+37 41894.221
+38 34252.554000000004
+39 31703.27
+40 30986.068
+41 32385.167
+42 36105.798
+43 30716.237
+44 34363.276
+45 30568.116
+46 31382.467
+47 32146.338
+48 30632.841
+49 38223.87
+50 40929.351
+51 30294.756
+52 32009.232
+53 30372.373
+54 37256.297
+55 41058.601
+56 33380.9
+57 34998.518000000004
+58 30640.109
+59 30462.853
+60 32779.714
+61 31531.68
+62 31897.475000000002
+63 31270.489
+64 33453.634
+65 30277.517
+66 30847.226000000002
+67 33043.155
+68 30408.618000000002
+69 30995.059
+70 30621.478
+71 30581.325
+72 31029.38
+73 30553.527000000002
+74 30989.046000000002
+75 31352.879
+76 31208.011000000002
+77 55033.794
+78 30729.492000000002
+79 30677.548
+80 39365.695
+81 30792.387000000002
+82 30217.134000000002
+83 32043.045000000002
+84 30694.067
+85 31303.43
+86 43492.18
+87 30845.775
+88 30641.589
+89 30699.226000000002
+90 30354.999
+91 30526.743000000002
+92 30826.794
+93 31668.65
+94 30670.104
+95 33603.598
+96 30882.761000000002
+97 30465.15
+98 33055.149
+99 30754.493000000002
+100 31022.914
+
+Duration: 326.7277217999998 ± 36.656885542300586 us/event
+Number of processed events:100
+Sum of jet multiplicity over the processed events: 77200
