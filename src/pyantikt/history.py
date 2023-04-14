@@ -1,12 +1,22 @@
 # Classes for history and sequences
 
+from enum import Enum
+
 from dataclasses import dataclass
 from pyantikt.pseudojet import PseudoJet
 from pyantikt.tiles import Tiling
 
+class HistoryState(Enum):
+    Original = -4
+    Invalid = -3
+    NonexistentParent = -2
+    BeamJet = -1
 
 @dataclass
 class HistoryElement:
+    # There is an unpleasant use of "magic numbers" here, so that
+    # state flags are mixed up with indexes
+
     # Index in _history where first parent of this jet
     # was created (-1 if this jet is an
     # original particle)

@@ -21,13 +21,15 @@ def find_python_jets(nevents: int):
     my_jets = []
 
     # N.B. Match Julia's natural counting here, start at 1!
+    print("Event: ", end="")
     for ievt, event in enumerate(events, start=1):
-        print(f"Event {ievt}")
+        print(".", end="", flush=True)
         antikt_jets = basicjetfinder(event, Rparam=0.4, ptmin=5.0)
         jet_list = []
         for ijet, jet in enumerate(antikt_jets):
             jet_list.append({"rap": jet.rap, "phi": jet.phi, "pt": jet.pt})
         my_jets.append({"jetid": ievt, "jets": jet_list})
+    print()
 
     return my_jets
 

@@ -2,7 +2,7 @@
 from copy import deepcopy
 from dataclasses import dataclass
 from math import pi
-from pyantikt.history import HistoryElement, ClusterSequence, initial_history
+from pyantikt.history import HistoryElement, ClusterSequence, initial_history, HistoryState
 from pyantikt.pseudojet import PseudoJet
 from sys import float_info
 
@@ -25,7 +25,7 @@ class BasicJetInfo:
     active: bool = True
 
 def geometric_distance(jetA: PseudoJet, jetB: PseudoJet):
-    """Distance between two jets"""
+    '''Distance between two jets'''
     dphi = pi - abs(pi - abs(jetA.phi - jetB.phi))
     drap = jetA.rap - jetB.rap
     return dphi * dphi + drap * drap
@@ -97,7 +97,16 @@ def test_for_nearest_neighbour(jetA: PseudoJet, jetB: PseudoJet):
         jetB.info.akt_dist = antikt_distance(jetB, jetA)
 
 
-def add_step_to_history(history, jets, parent1, parent2, jetp_index, distance):
+def add_step_to_history(history: list[HistoryElement], jets: list[PseudoJet], 
+                        parent1: int, parent2: int, jetp_index: int, distance: float):
+    '''Add a merging step to the history of clustering
+        history - list of HistoryElement entities
+        jets - list of pseudojets
+        parent1 - the *history* element which is the parent of this merger
+        parent2 - the *history* element which is the parent of this merger (can be Invalid)
+        jetp_index - the new pseudojet that results from this merger (if both parents exist)
+        distance - the distance metric for this merge step
+    '''
     max_dij_so_far = max(distance, history[-1].max_dij_so_far)
 
     history.append(HistoryElement(parent1=parent1, parent2=parent2,
@@ -129,14 +138,14 @@ def add_step_to_history(history, jets, parent1, parent2, jetp_index, distance):
         jets[jetp_index].cluster_hist_index = local_step
 
 def inclusive_jets(jets: list[PseudoJet], history: list[HistoryElement], ptmin:float=0.0):
-    """return all inclusive jets of a ClusterSequence with pt > ptmin"""
+    '''return all inclusive jets of a ClusterSequence with pt > ptmin'''
     dcut = ptmin * ptmin
     jets_local = list()
     # For inclusive jets with a plugin algorithm, we make no
     # assumptions about anything (relation of dij to momenta,
     # ordering of the dij, etc.)
     for elt in reversed(history):
-        if elt.parent2 != -1:
+        if elt.parent2 != BeamJet:
             continue
         iparent_jet = history[elt.parent1].jetp_index
         jet = jets[iparent_jet]
