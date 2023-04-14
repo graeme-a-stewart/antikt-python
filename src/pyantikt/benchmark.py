@@ -11,8 +11,8 @@ from subprocess import run
 
 @dataclass
 class Benchmark:
-    git_branch: str = run("git branch --show-current", capture_output=True, text=True).stdout.strip()
-    git_hash: str = run("git rev-list --max-count=1 HEAD", capture_output=True, text=True).stdout.strip()
+    git_branch: str = run(("git", "branch", "--show-current"), capture_output=True, text=True).stdout.strip()
+    git_hash: str = run(("git", "rev-list", "--max-count=1", "HEAD"), capture_output=True, text=True).stdout.strip()
     timestamp: datetime = datetime.today()
     testname: str = Path(sys.argv[0]).name
     args: list = field(default_factory=list),

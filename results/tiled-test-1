@@ -1,0 +1,42 @@
+{
+  "git_branch": "main",
+  "git_hash": "371ceab746ccc17c520a67838b82ff701c7de29f",
+  "timestamp": "2023-04-14 15:48:14.859654",
+  "testname": "antikt-tiledN2cluster.py",
+  "args": [
+    "--maxevents=100",
+    "--trials",
+    "16",
+    "--benchmark",
+    "../results/tiled-test-1",
+    "../data/events.hepmc3"
+  ],
+  "nevents": 100,
+  "runtimes": [
+    2524772.3959999084,
+    2548490.539999962,
+    2622361.8940000534,
+    2572738.930999756,
+    2558501.1909999847,
+    2543898.132999897,
+    2555817.1280002594,
+    2562183.361000061,
+    2528910.487999916,
+    2559081.356999874,
+    2558557.7550001144,
+    2573847.605000019,
+    2543992.1300001144,
+    2575147.421000004,
+    2551999.2789998055,
+    2567888.779999733
+  ],
+  "trials": 16,
+  "version": "3.11.0",
+  "platform": {
+    "system": "Linux",
+    "node": "SilverSurface",
+    "release": "5.15.90.1-microsoft-standard-WSL2",
+    "version": "#1 SMP Fri Jan 27 02:56:13 UTC 2023",
+    "machine": "x86_64"
+  }
+}
