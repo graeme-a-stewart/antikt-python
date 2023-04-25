@@ -8,7 +8,7 @@ from sys import float_info
 
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("jetfinder")
 
 from numba import njit
 

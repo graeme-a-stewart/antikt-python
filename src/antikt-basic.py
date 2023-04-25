@@ -11,8 +11,12 @@ from pathlib import Path
 from pyantikt.hepmc import read_jet_particles
 from pyantikt.basicjetfinder import basicjetfinder
 from pyantikt.benchmark import Benchmark
-from pyantikt.acceleratedbasicjetfinder import basicjetfinder
-#from pyantikt.basicjetfinder import basicjetfinder
+
+try:
+    import pyantikt.acceleratedbasicjetfinder
+except ImportError as e:
+    print(f"pyantikt.acceleratedbasicjetfinder unavailable: {e}")
+import pyantikt.basicjetfinder
 
 
 def main():
@@ -38,20 +42,30 @@ def main():
     parser.add_argument(
         "--benchmark", help="Benchmark results to a file"
     )
+    parser.add_argument("--numba", action="store_true", help="Run accelerated numba code version")
     parser.add_argument("eventfile", help="File with HepMC3 events to process")
 
     args = parser.parse_args(sys.argv[1:])
 
     if args.info:
         logger.setLevel(logging.INFO)
-        logging.getLogger("pyantikt.basicjetfinder").setLevel(logging.INFO)
+        logging.getLogger("jetfinder").setLevel(logging.INFO)
     if args.debug:
         logger.setLevel(logging.DEBUG)
-        logging.getLogger("pyantikt.basicjetfinder").setLevel(logging.DEBUG)
+        logging.getLogger("jetfinder").setLevel(logging.DEBUG)
 
     if args.output:
         logout = logging.FileHandler(args.output, mode="w")
-        logging.getLogger("pyantikt.basicjetfinder").addHandler(logout)
+        logging.getLogger("jetfinder").addHandler(logout)
+
+    # Switch between implenentations here
+    if args.numba:
+        try:
+            basicjetfinder = pyantikt.acceleratedbasicjetfinder.basicjetfinder
+        except AttributeError as e:
+            raise RuntimeError("Numba accelerated code requested, but it's unavailable") from e
+    else:
+        basicjetfinder = pyantikt.basicjetfinder.basicjetfinder
 
     events = read_jet_particles(
         file=args.eventfile, skip=args.skip, nevents=args.maxevents
@@ -88,6 +102,6 @@ if __name__ == "__main__":
     ch.setFormatter(formatter)
 
     logger.addHandler(ch)
-    logging.getLogger("pyantikt.basicjetfinder").addHandler(ch)
+    logging.getLogger("jetfinder").addHandler(ch)
 
     main()
