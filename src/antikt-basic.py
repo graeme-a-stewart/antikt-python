@@ -31,7 +31,9 @@ def main():
         default=1,
         help="Maximum number of events to process",
     )
-    parser.add_argument("--trials", type=int, default=1, help="Number of trials to repeat")
+    parser.add_argument(
+        "--trials", type=int, default=1, help="Number of trials to repeat"
+    )
     parser.add_argument("--output", metavar="FILE", help="Write logging output to FILE")
     parser.add_argument(
         "--debug", action="store_true", help="Activate logging debugging mode"
@@ -39,10 +41,10 @@ def main():
     parser.add_argument(
         "--info", action="store_true", help="Activate logging info mode"
     )
+    parser.add_argument("--benchmark", help="Benchmark results to a file")
     parser.add_argument(
-        "--benchmark", help="Benchmark results to a file"
+        "--numba", action="store_true", help="Run accelerated numba code version"
     )
-    parser.add_argument("--numba", action="store_true", help="Run accelerated numba code version")
     parser.add_argument("eventfile", help="File with HepMC3 events to process")
 
     args = parser.parse_args(sys.argv[1:])
@@ -63,7 +65,9 @@ def main():
         try:
             basicjetfinder = pyantikt.acceleratedbasicjetfinder.basicjetfinder
         except AttributeError as e:
-            raise RuntimeError("Numba accelerated code requested, but it's unavailable") from e
+            raise RuntimeError(
+                "Numba accelerated code requested, but it's unavailable"
+            ) from e
     else:
         basicjetfinder = pyantikt.basicjetfinder.basicjetfinder
 
@@ -73,7 +77,7 @@ def main():
 
     benchmark = Benchmark(nevents=args.maxevents)
 
-    for itrial in range(1, args.trials+1):
+    for itrial in range(1, args.trials + 1):
         start = time.monotonic_ns() / 1000.0  # microseconds
         for ievt, event in enumerate(events, start=1):
             logger.info(f"Event {ievt} has {len(event)} particles")
@@ -82,7 +86,7 @@ def main():
             for ijet, jet in enumerate(antikt_jets):
                 logger.info(f"{ijet}, {jet.rap}, {jet.phi}, {jet.pt}")
         end = time.monotonic_ns() / 1000.0
-        benchmark.runtimes.append(end-start)
+        benchmark.runtimes.append(end - start)
         print(f"Trial {itrial}. Processed {len(events)} events in {end-start:,.2f} us")
         print(f"Time per event: {(end-start)/len(events):,.2f} us")
 
@@ -90,6 +94,7 @@ def main():
         with open(args.benchmark, mode="w") as benchmark_file:
             print(benchmark.to_json(), file=benchmark_file)
         logger.info(benchmark)
+
 
 if __name__ == "__main__":
     logger = logging.getLogger(Path(sys.argv[0]).name)
