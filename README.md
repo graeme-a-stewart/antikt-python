@@ -1,8 +1,8 @@
 # AntiKt-Python
 
-This package is an implementation of the [AntiKt algorithm](https://arxiv.org/abs/0802.1189) in Python.
+This package is an implementation of the [AntiKt algorithm](https://arxiv.org/abs/0802.1189) in Python, with both a basic version and a tiled implementation.
 
-There is a pure Python implementation and one using `numpy`.
+There is a pure Python implementation and one using `numpy` plus `numba`.
 
 This code is used in the CHEP 2023 Paper, *Polyglot Jet Finding*.
 
