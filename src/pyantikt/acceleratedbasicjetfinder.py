@@ -1,4 +1,4 @@
-from pyantikt.history import HistoryElement, initial_history
+from pyantikt.nphistory import NPHistory
 from pyantikt.pseudojet import PseudoJet
 from pyantikt.nppseudojet import NPPseudoJets
 
@@ -9,6 +9,7 @@ import numpy.typing as npt
 logger = logging.getLogger("jetfinder")
 
 from numba import njit
+from copy import deepcopy
 
 Invalid = -3
 NonexistentParent = -2
@@ -84,7 +85,7 @@ def compare_status(working:NPPseudoJets, test:NPPseudoJets):
         raise RuntimeError("Jet sets are not the same and they should be!")
 
 
-def add_step_to_history(history: list[HistoryElement], jets: list[PseudoJet], 
+def add_step_to_history(history: NPHistory, jets: list[PseudoJet], 
                         parent1: int, parent2: int, jetp_index: int, distance: float):
     '''Add a merging step to the history of clustering
         history - list of HistoryElement entities
@@ -94,47 +95,47 @@ def add_step_to_history(history: list[HistoryElement], jets: list[PseudoJet],
         jetp_index - the new pseudojet that results from this merger (if both parents exist)
         distance - the distance metric for this merge step
     '''
-    max_dij_so_far = max(distance, history[-1].max_dij_so_far)
+    max_dij_so_far = max(distance, history.max_dij_so_far[history.size-1])
 
-    history.append(HistoryElement(parent1=parent1, parent2=parent2,
-                                    jetp_index=jetp_index, dij=distance,
-                                    max_dij_so_far=max_dij_so_far))
-    local_step = len(history) - 1
-    # logger.debug(f"Added history step {local_step}: {history[-1]}")
+    history.append(parent1=parent1, parent2=parent2, jetp_index=jetp_index, dij=distance,
+                                    max_dij_so_far=max_dij_so_far)
+
+    local_step = history.next-1
+    logger.debug(f"Added history step {local_step}: {history.parent1[local_step]}")
 
     if parent1 >= 0:
-        if history[parent1].child != -1:
+        if history.child[parent1] != -1:
             raise (
                 RuntimeError(
                     f"Internal error. Trying to recombine a parent1 object that has previsously been recombined: {parent1}"
                 )
             )
-    history[parent1].child = local_step
+    history.child[parent1] = local_step
 
     if parent2 >= 0:
-        if history[parent2].child != -1:
+        if history.child[parent2] != -1:
             raise (
                 RuntimeError(
                     f"Internal error. Trying to recombine a parent1 object that has previsously been recombined: {parent2}"
                 )
             )
-    history[parent2].child = local_step
+    history.child[parent2] = local_step
 
     # get cross-referencing right from PseudoJets
     if jetp_index >= 0:
         jets[jetp_index].cluster_hist_index = local_step
 
-def inclusive_jets(jets: list[PseudoJet], history: list[HistoryElement], ptmin:float=0.0):
+def inclusive_jets(jets: list[PseudoJet], history: NPHistory, ptmin:float=0.0):
     '''return all inclusive jets of a ClusterSequence with pt > ptmin'''
     dcut = ptmin * ptmin
     jets_local = list()
     # For inclusive jets with a plugin algorithm, we make no
     # assumptions about anything (relation of dij to momenta,
     # ordering of the dij, etc.)
-    for elt in reversed(history):
-        if elt.parent2 != BeamJet:
+    for elt in range(history.size-1, -1, -1):
+        if history.parent2[elt] != BeamJet:
             continue
-        iparent_jet = history[elt.parent1].jetp_index
+        iparent_jet = history.jetp_index[history.parent1[elt]]
         jet = jets[iparent_jet]
         if jet.pt2 >= dcut:
             jets_local.append(jet)
@@ -147,7 +148,8 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
     invR2 = 1.0 / R2
 
     # Create a container of PseudoJet objects
-    history, Qtot = initial_history(initial_particles)
+    history = NPHistory(2 * len(initial_particles))
+    Qtot = history.fill_initial_history(initial_particles)
 
     # Was doing a deepcopy here, but that turns out to be
     # 1. unnecessary
