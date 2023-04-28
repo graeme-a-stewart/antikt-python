@@ -1,15 +1,10 @@
-
-from dataclasses import dataclass
-from math import pi
-from pyantikt.history import HistoryElement, ClusterSequence, initial_history, HistoryState
+from pyantikt.history import HistoryElement, initial_history
 from pyantikt.pseudojet import PseudoJet
 from pyantikt.nppseudojet import NPPseudoJets
-from sys import float_info
 
 import logging
 import numpy as np
 import numpy.typing as npt
-import numpy.ma as ma
 
 logger = logging.getLogger("jetfinder")
 
