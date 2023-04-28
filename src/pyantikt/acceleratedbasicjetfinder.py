@@ -146,7 +146,7 @@ def add_step_to_history(history: list[HistoryElement], jets: list[PseudoJet],
                                     jetp_index=jetp_index, dij=distance,
                                     max_dij_so_far=max_dij_so_far))
     local_step = len(history) - 1
-    logger.debug(f"Added history step {local_step}: {history[-1]}")
+    # logger.debug(f"Added history step {local_step}: {history[-1]}")
 
     if parent1 >= 0:
         if history[parent1].child != -1:
@@ -207,7 +207,6 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
     # initial operation (N^2 scaling here)
     scan_for_all_nearest_neighbours(npjets.phi, npjets.rap, npjets.inv_pt2, 
                                     npjets.dist, npjets.akt_dist, npjets.nn, npjets.mask, R2)
-    logger.debug(npjets)
 
     # Each iteration we either merge two jets to one, or we
     # finalise a jet. Thus it takes a number of iterations
@@ -217,11 +216,11 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
         ijetB = npjets.nn[ijetA]
         # Add normalisation for real distance
         distance *= invR2
-        logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA} and jet {ijetB}")
 
         if (ijetB >= 0):
             if ijetB < ijetA:
                 ijetA, ijetB = ijetB, ijetA
+            logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA} and jet {ijetB}")
 
             # Merge jets
             npjets.mask_slot(ijetA)
@@ -239,6 +238,7 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
             scan_for_my_nearest_neighbours(inewjet, npjets.phi, npjets.rap, npjets.inv_pt2, 
                                            npjets.dist, npjets.akt_dist, npjets.nn, npjets.mask, R2)
         else:
+            logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA} and jet {ijetB}")
             # Beamjet
             npjets.mask_slot(ijetA)
             add_step_to_history(history=history, jets=jets, parent1=jets[ijetA].cluster_hist_index, 

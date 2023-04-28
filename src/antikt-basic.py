@@ -77,6 +77,12 @@ def main():
 
     benchmark = Benchmark(nevents=args.maxevents)
 
+    # If we are bencmarking the numba code, do a warm up run
+    # to jit compile the accelerated code
+    if args.benchmark and args.numba:
+        print("Warm up run with first event to jit compile code")
+        basicjetfinder(events[0], Rparam=0.4, ptmin=0.5)
+
     for itrial in range(1, args.trials + 1):
         start = time.monotonic_ns() / 1000.0  # microseconds
         for ievt, event in enumerate(events, start=1):
@@ -103,7 +109,7 @@ if __name__ == "__main__":
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
 
-    formatter = logging.Formatter("%(name)s: %(message)s")
+    formatter = logging.Formatter("%(message)s")
     ch.setFormatter(formatter)
 
     logger.addHandler(ch)
