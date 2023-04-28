@@ -1,5 +1,4 @@
 
-from copy import deepcopy
 from dataclasses import dataclass
 from math import pi
 from pyantikt.history import HistoryElement, ClusterSequence, initial_history, HistoryState
@@ -194,7 +193,11 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
 
     # Create a container of PseudoJet objects
     history, Qtot = initial_history(initial_particles)
-    jets = deepcopy(initial_particles)
+
+    # Was doing a deepcopy here, but that turns out to be
+    # 1. unnecessary
+    # 2. extremely expensive
+    jets = initial_particles
     for ijet, jet in enumerate(jets):
         jet.info = BasicJetInfo(id = ijet, nn_dist=R2)
 

@@ -7,6 +7,7 @@ import time
 import logging
 
 from pathlib import Path
+from copy import deepcopy
 
 from pyantikt.hepmc import read_jet_particles
 from pyantikt.basicjetfinder import basicjetfinder
@@ -71,7 +72,7 @@ def main():
     else:
         basicjetfinder = pyantikt.basicjetfinder.basicjetfinder
 
-    events = read_jet_particles(
+    orignal_events = read_jet_particles(
         file=args.eventfile, skip=args.skip, nevents=args.maxevents
     )
 
@@ -81,9 +82,13 @@ def main():
     # to jit compile the accelerated code
     if args.benchmark and args.numba:
         print("Warm up run with first event to jit compile code")
-        basicjetfinder(events[0], Rparam=0.4, ptmin=0.5)
+        basicjetfinder(deepcopy(orignal_events[0]), Rparam=0.4, ptmin=0.5)
 
     for itrial in range(1, args.trials + 1):
+        if args.trials > 1:
+            events = deepcopy(orignal_events)
+        else:
+            events = orignal_events
         start = time.monotonic_ns() / 1000.0  # microseconds
         for ievt, event in enumerate(events, start=1):
             logger.info(f"Event {ievt} has {len(event)} particles")
