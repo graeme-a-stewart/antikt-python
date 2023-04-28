@@ -19,31 +19,6 @@ Invalid = -3
 NonexistentParent = -2
 BeamJet = -1
 
-@dataclass
-class BasicJetInfo:
-    '''This is an add on class where we can augment the pseudojets
-    with nearest neighbour information'''
-    id: int = -1          # My jetID (which will be the index in the jet list)
-    nn: int | None = None # ID of my nearest neighbour
-    nn_dist: float = float_info.max  # Geometric distance
-    akt_dist: float = float_info.max # AntiKt jet distance
-    active: bool = True
-
-@njit
-def geometric_distance(jetAphi: float, jetArap: float, jetBphi: float, jetBrap:float):
-    '''Distance between two jets'''
-    dphi = pi - abs(pi - abs(jetAphi - jetBphi))
-    drap = jetArap - jetBrap
-    return dphi * dphi + drap * drap
-
-@njit
-def antikt_distance(jetAdist: float, jetAipt2: float, jetBipt2:float):
-    '''AntiKt distance between two jets'''
-    if jetBipt2 > 0.0:
-        inv_pt2 = min(jetAipt2, jetBipt2)
-    else:
-        inv_pt2 = jetAipt2
-    return jetAdist * inv_pt2
 
 @njit
 def find_closest_jets(akt_dist:npt.ArrayLike, nn:npt.ArrayLike):
@@ -101,21 +76,6 @@ def scan_for_my_nearest_neighbours(ijet:int, phi: npt.ArrayLike,
             dist[iclosejet] = dist[ijet]
             nn[iclosejet] = ijet
             akt_dist[iclosejet] = dist[iclosejet] * (inv_pt2[ijet] if inv_pt2[ijet] < inv_pt2[iclosejet] else inv_pt2[iclosejet])
- 
-
-def test_for_nearest_neighbour(jetA: PseudoJet, jetB: PseudoJet):
-    '''Test two jets and see if they are nearest neighbours'''
-    if jetA.info.id == jetB.info.id:
-        return
-    dist = geometric_distance(jetA.phi, jetA.rap, jetB.phi, jetB.rap)
-    if dist < jetA.info.nn_dist:
-        jetA.info.nn_dist = dist
-        jetA.info.nn = jetB.info.id
-        jetA.info.akt_dist = antikt_distance(jetA.info.nn_dist, jetA.inv_pt2, jetB.inv_pt2)
-    if dist < jetB.info.nn_dist:
-        jetB.info.nn_dist = dist
-        jetB.info.nn = jetA.info.id
-        jetB.info.akt_dist = antikt_distance(jetB.info.nn_dist, jetB.inv_pt2, jetA.inv_pt2)
 
 
 def compare_status(working:NPPseudoJets, test:NPPseudoJets):
@@ -198,8 +158,6 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
     # 1. unnecessary
     # 2. extremely expensive
     jets = initial_particles
-    for ijet, jet in enumerate(jets):
-        jet.info = BasicJetInfo(id = ijet, nn_dist=R2)
 
     # Create the numpy arrays corresponding to the pseudojets that will be used
     # for fast calculations
@@ -234,15 +192,15 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
             jet_indexB = npjets.jets_index[ijetB]
 
             merged_jet = jets[jet_indexA] + jets[jet_indexB]
-            merged_jet.info = BasicJetInfo(id = len(jets), nn_dist=R2)
+            imerged_jet = len(jets)
             jets.append(merged_jet)
 
             # We recycle the slot of jetA (which is the lowest slot)
-            npjets.insert_jet(merged_jet, slot=ijetA, jet_index=merged_jet.info.id)
+            npjets.insert_jet(merged_jet, slot=ijetA, jet_index=imerged_jet)
             add_step_to_history(history=history, jets=jets, 
                                 parent1=jets[jet_indexA].cluster_hist_index,
                                 parent2=jets[jet_indexB].cluster_hist_index,
-                                jetp_index=merged_jet.info.id, distance=distance)
+                                jetp_index=imerged_jet, distance=distance)
             
             # Get the NNs for the merged pseudojet
             scan_for_my_nearest_neighbours(ijetA, npjets.phi, npjets.rap, npjets.inv_pt2, 
