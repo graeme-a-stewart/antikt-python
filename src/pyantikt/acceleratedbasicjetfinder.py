@@ -200,13 +200,14 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
 
     # Create the numpy arrays corresponding to the pseudojets that will be used
     # for fast calculations
-    npjets = NPPseudoJets(len(jets) * 2)
+    npjets = NPPseudoJets(len(jets))
     npjets.set_jets(jets)
 
     # Setup the nearest neighbours, which is an expensive
     # initial operation (N^2 scaling here)
     scan_for_all_nearest_neighbours(npjets.phi, npjets.rap, npjets.inv_pt2, 
-                                    npjets.dist, npjets.akt_dist, npjets.nn, npjets.mask, R2)
+                                    npjets.dist, npjets.akt_dist, npjets.nn, 
+                                    npjets.mask, R2)
 
     # Each iteration we either merge two jets to one, or we
     # finalise a jet. Thus it takes a number of iterations
@@ -225,28 +226,36 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
             # Merge jets
             npjets.mask_slot(ijetA)
             npjets.mask_slot(ijetB)
-            merged_jet = jets[ijetA] + jets[ijetB]
+
+            jet_indexA = npjets.jets_index[ijetA]
+            jet_indexB = npjets.jets_index[ijetB]
+
+            merged_jet = jets[jet_indexA] + jets[jet_indexB]
             merged_jet.info = BasicJetInfo(id = len(jets), nn_dist=R2)
             jets.append(merged_jet)
-            inewjet = npjets.insert_jet(merged_jet)
+
+            # We recycle the slot of jetA (which is the lowest slot)
+            npjets.insert_jet(merged_jet, slot=ijetA, jet_index=merged_jet.info.id)
             add_step_to_history(history=history, jets=jets, 
-                                parent1=jets[ijetA].cluster_hist_index,
-                                parent2=jets[ijetB].cluster_hist_index,
+                                parent1=jets[jet_indexA].cluster_hist_index,
+                                parent2=jets[jet_indexB].cluster_hist_index,
                                 jetp_index=merged_jet.info.id, distance=distance)
             
             # Get the NNs for the merged pseudojet
-            scan_for_my_nearest_neighbours(inewjet, npjets.phi, npjets.rap, npjets.inv_pt2, 
+            scan_for_my_nearest_neighbours(ijetA, npjets.phi, npjets.rap, npjets.inv_pt2, 
                                            npjets.dist, npjets.akt_dist, npjets.nn, npjets.mask, R2)
         else:
             logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA} and jet {ijetB}")
             # Beamjet
             npjets.mask_slot(ijetA)
-            add_step_to_history(history=history, jets=jets, parent1=jets[ijetA].cluster_hist_index, 
+            jet_indexA = npjets.jets_index[ijetA]
+            add_step_to_history(history=history, jets=jets, parent1=jets[jet_indexA].cluster_hist_index, 
                                 parent2=BeamJet, 
                                 jetp_index=Invalid, distance=distance)
 
         # Now need to update nearest distances, when pseudojets are unmasked and
         # had either jetA or jetB as their nearest neighbour
+        # Note, it doesn't matter that we reused the ijetA slot here!
         if ijetB != -1:
             jets_to_update = np.logical_and(~npjets.mask, np.logical_or(npjets.nn == ijetA , npjets.nn == ijetB))
         else:
