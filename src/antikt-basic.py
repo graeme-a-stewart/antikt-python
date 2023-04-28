@@ -105,6 +105,8 @@ def main():
         with open(args.benchmark, mode="w") as benchmark_file:
             print(benchmark.to_json(), file=benchmark_file)
         logger.info(benchmark)
+        mean, stddev = benchmark.get_stats()
+        print(f"Mean time per event {mean:,.2f} ± {stddev:,.2f} us")
 
 
 if __name__ == "__main__":

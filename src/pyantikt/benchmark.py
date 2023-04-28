@@ -3,6 +3,7 @@
 import json
 import platform
 import sys
+import statistics
 
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -39,5 +40,13 @@ class Benchmark:
             'version': self.version,
             'platform': self.platform,
         }
+        mean, stddev = self.get_stats()
+        me["mean"] = mean
+        me["stddev"] = stddev
         return json.dumps(me, indent=2)
+    
+    def get_stats(self):
+        mean = statistics.mean(self.runtimes) / self.nevents
+        stddev = statistics.stdev(self.runtimes) / self.nevents
+        return mean, stddev
     
