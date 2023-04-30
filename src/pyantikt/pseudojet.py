@@ -53,6 +53,11 @@ class PseudoJet:
         )
 
     @property
+    def pt(self):
+        """transverse momentum"""
+        return sqrt(self.pt2)
+
+    @property
     def m2(self):
         """squared invariant mass"""
         return (self.E + self.pz) * (self.E - self.pz) - self.pt2
