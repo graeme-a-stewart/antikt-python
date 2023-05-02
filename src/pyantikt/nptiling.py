@@ -7,6 +7,7 @@ import numpy.typing as npt
 from numba import njit
 
 from pyantikt.nppseudojet import NPPseudoJets
+from pyantikt.pseudojet import PseudoJet
 
 # This one is so simple, just keep it as a dataclass
 @dataclass
@@ -31,38 +32,102 @@ class NPTiling:
     def __init__(self, setup:TilingDef, max_jets_per_tile:int):
         self.setup = setup
         self.max_jets_per_tile = max_jets_per_tile
-        self.phi = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=float)         # phi
         self.rap = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=float)         # rapidity
+        self.phi = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=float)         # phi
         self.inv_pt2 = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=float)     # 1/pt^2
         self.dist = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=float)        # nearest neighbour geometric distance
-        self.nn = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=int)            # nearest neighbour antikt metric
+        self.akt_dist = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=float)    # nearest neighbour antikt metric
+        self.nn = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=(np.int64,3))        # nearest neighbour coordinates
         self.mask = np.ones((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=bool)          # if True this is not an active jet slot
         self.npjets_index = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=int)  # index reference to the NPPseudoJet
+        self.jets_index = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=int)    # index reference to the PseudoJet
 
+        # Setup safety values for distances
+        self.dist.fill(1e20)
+        self.akt_dist.fill(1e20)
+        # self.nn.fill((-1,-1,-1))
 
-        # self.size = size
-        # self.phi = np.zeros(size, dtype=float)              # phi
-        # self.rap = np.zeros(size, dtype=float)              # rapidity
-        # self.inv_pt2 = np.zeros(size, dtype=float)          # 1/pt^2
-        # self.dist = np.zeros(size, dtype=float)             # nearest neighbour geometric distance
-        # self.akt_dist = np.zeros(size, dtype=float)         # nearest neighbour antikt metric
-        # self.nn = np.zeros(size, dtype=int)                 # index of my nearest neighbour
-        # self.mask = np.ones(size, dtype=bool)               # if True this is not an active jet anymore
-        # self.jets_index = np.zeros(size, dtype=int)         # index reference to the PseudoJet list
+        # This tuple holds the rightmost neighbour tiles of any tile
+        # N.B. phi wraps, but rap does not
+        # If an entry is (-1,-1) it's an invalid neighbour
+        # The 4 members of this array are up, up-right, right, down-right:
+        #      -  0  1
+        #      -  X  2
+        #      -  -  3
+        self.righttiles = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, 4), dtype=(np.int64, 2))
+        for irap in range(setup.n_tiles_rap):
+            for iphi in range(setup.n_tiles_phi):
+                if irap == 0:
+                    self.righttiles[irap,iphi,0] == (-1,-1)
+                    self.righttiles[irap,iphi,1] == (-1,-1)
+                else:
+                    self.righttiles[irap,iphi,0] == (irap-1,iphi)
+                    self.righttiles[irap,iphi,1] == (irap-1,iphi+1 if iphi != setup.n_tiles_phi-1 else 0)
+                self.righttiles[irap,iphi,2] == (irap,iphi+1 if iphi != setup.n_tiles_phi-1 else 0)
+                if irap == setup.n_tiles_rap-1:
+                    self.righttiles[irap,iphi,3] == (-1,-1)
+                else:
+                    self.righttiles[irap,iphi,3] == (irap-1,iphi+1 if iphi != setup.n_tiles_phi-1 else 0)
+                
 
     def fill_with_jets(self, npjets:NPPseudoJets):
         # First bulk calculate the bin indexes we need to use
-        _irap, _iphi = _get_tile_indexes(self.setup.tiles_rap_min, 
+        _irap, _iphi = get_tile_indexes(self.setup.tiles_rap_min, 
                                        self.setup.tile_size_rap,
                                        self.setup.n_tiles_rap,
                                        self.setup.n_tiles_phi,
                                        npjets.rap,
                                        npjets.phi)
-        for r, p in zip(_irap, _iphi):
-            print(f"({r}, {p})")
-    
+
+        # Now place jets into the correct locations
+        # There's no way to avoid a loop here that I can see!
+        for ijet in range(npjets.size):
+            # Find the first empty slot in the tile
+            try:
+                islot = np.where(self.mask[_irap[ijet], _iphi[ijet]])[0][0]
+            except IndexError:
+                print(f"No free tile slot at ({_irap[ijet]}, {_iphi[ijet]})")
+                print(ijet, _irap[ijet], _iphi[ijet], self.mask[_irap[ijet], _iphi[ijet]])
+            self.rap[_irap[ijet], _iphi[ijet], islot] = npjets.rap[ijet]
+            self.phi[_irap[ijet], _iphi[ijet], islot] = npjets.phi[ijet]
+            self.inv_pt2[_irap[ijet], _iphi[ijet], islot] = npjets.inv_pt2[ijet]
+            self.dist[_irap[ijet], _iphi[ijet], islot] = npjets.dist[ijet]
+            self.akt_dist[_irap[ijet], _iphi[ijet], islot] = npjets.akt_dist[ijet]
+            self.nn[_irap[ijet], _iphi[ijet], islot] = (-1,-1,-1)
+            self.mask[_irap[ijet], _iphi[ijet], islot] = False
+            self.npjets_index[_irap[ijet], _iphi[ijet], islot] = ijet
+            self.jets_index[_irap[ijet], _iphi[ijet], islot] = npjets.jets_index[ijet]
+
+    def mask_slot(self, ijet:tuple[int]):
+        self.mask[ijet] = True
+        self.dist[ijet] = self.akt_dist[ijet] = 1e20
+
+    def insert_jet(self, newjet:PseudoJet, npjet_index:int):
+        _irap = int((newjet.rap - self.setup.tiles_rap_min) / self.setup.tile_size_rap)
+        if _irap < 0:
+            _irap = 0
+        elif _irap > self.setup.n_tiles_rap-1:
+            _irap = self.setup.n_tiles_rap-1
+        _iphi = int(newjet.phi * self.setup.n_tiles_phi / (2.0 * np.pi))
+        try:
+            islot = np.where(self.mask[_irap, _iphi])[0][0]
+        except IndexError:
+            print(f"No free tile slot at ({_irap}, {_iphi})")
+            print(_irap, _iphi, self.mask[_irap, _iphi])
+        self.rap[_irap, _iphi, islot] = newjet.rap
+        self.phi[_irap, _iphi, islot] = newjet.phi
+        self.inv_pt2[_irap, _iphi, islot] = newjet.inv_pt2
+        self.dist[_irap, _iphi, islot] = 1e20
+        self.akt_dist[_irap, _iphi, islot] = 1e20
+        self.nn[_irap, _iphi, islot] = (-1,-1,-1)
+        self.mask[_irap, _iphi, islot] = False
+        self.npjets_index[_irap, _iphi, islot] = -1
+        self.jets_index[_irap, _iphi, islot] = npjet_index
+        print(f"Added new jet {npjet_index} to ({_irap}, {_iphi}, {islot})")
+        return _irap, _iphi, islot
+
 @njit
-def _get_tile_indexes(tiles_rap_min:npt.DTypeLike, 
+def get_tile_indexes(tiles_rap_min:npt.DTypeLike, 
                         tile_size_rap:npt.DTypeLike,
                         n_tiles_rap:npt.DTypeLike,
                         n_tiles_phi:npt.DTypeLike,
@@ -74,10 +139,10 @@ def _get_tile_indexes(tiles_rap_min:npt.DTypeLike,
     _irap = _irap.astype(np.int64)
     _irap = np.where(_irap < 0, 0, _irap)
     _irap = np.where(_irap >= n_tiles_rap, n_tiles_rap-1, _irap)
-    print(_irap)
+    # print(_irap)
 
     _iphi = phi * n_tiles_phi / (2.0 * np.pi)
     _iphi = _iphi.astype(np.int64)
-    print(_iphi)
+    # print(_iphi)
 
     return _irap, _iphi
