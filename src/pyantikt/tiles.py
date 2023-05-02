@@ -51,8 +51,8 @@ class TilingDef:
 
     tiles_eta_min: float
     tiles_eta_max: float
-    tile_size_eta: int
-    tile_size_phi: int
+    tile_size_eta: float
+    tile_size_phi: float
     n_tiles_eta: int
     n_tiles_phi: int
     tiles_ieta_min: float

@@ -1,17 +1,25 @@
 #! /usr/bin/env python3
-"""Anti-Kt jet finder, Tiled N^2 version"""
+"""Anti-Kt jet finder, Tiled N^2 version
+   Can use numba and numpy for acceleration
+"""
 
 import argparse
 import sys
 import time
 import logging
 
+from copy import deepcopy
 from pathlib import Path
 
 from pyantikt.hepmc import read_jet_particles
-from pyantikt.tiledjetfinder import faster_tiled_N2_cluster
+
 from pyantikt.benchmark import Benchmark
 
+try:
+    import pyantikt.acceleratedtiledjetfinder
+except ImportError as e:
+    print(f"pyantikt.acceleratedtiledjetfinder unavailable: {e}")
+import pyantikt.tiledjetfinder
 
 def main():
     parser = argparse.ArgumentParser(description="Tiled N^2 AntiKt Jet Finder")
@@ -30,6 +38,9 @@ def main():
     )
     parser.add_argument("--output", metavar="FILE", help="Write logging output to FILE")
     parser.add_argument(
+        "--numba", action="store_true", help="Run accelerated numba code version"
+    )
+    parser.add_argument(
         "--debug", action="store_true", help="Activate logging debugging mode"
     )
     parser.add_argument(
@@ -42,22 +53,43 @@ def main():
 
     if args.info:
         logger.setLevel(logging.INFO)
-        logging.getLogger("pyantikt.tiledjetfinder").setLevel(logging.INFO)
+        logging.getLogger("jetfinder").setLevel(logging.INFO)
     if args.debug:
         logger.setLevel(logging.DEBUG)
-        logging.getLogger("pyantikt.tiledjetfinder").setLevel(logging.DEBUG)
+        logging.getLogger("jetfinder").setLevel(logging.DEBUG)
 
     if args.output:
         logout = logging.FileHandler(args.output)
-        logging.getLogger("pyantikt.tiledjetfinder").addHandler(logout)
+        logging.getLogger("jetfinder").addHandler(logout)
 
-    events = read_jet_particles(
+    # Switch between implenentations here
+    if args.numba:
+        try:
+            faster_tiled_N2_cluster = pyantikt.acceleratedtiledjetfinder.faster_tiled_N2_cluster
+        except AttributeError as e:
+            raise RuntimeError(
+                "Numba accelerated code requested, but it's unavailable"
+            ) from e
+    else:
+        faster_tiled_N2_cluster = pyantikt.tiledjetfinder.faster_tiled_N2_cluster
+
+    original_events = read_jet_particles(
         file=args.eventfile, skip=args.skip, nevents=args.maxevents
     )
 
     benchmark = Benchmark(nevents=args.maxevents)
 
+    # If we are bencmarking the numba code, do a warm up run
+    # to jit compile the accelerated code
+    if args.benchmark and args.numba:
+        print("Warm up run with first event to jit compile code")
+        faster_tiled_N2_cluster(deepcopy(original_events[0]), Rparam=0.4, ptmin=0.5)
+
     for itrial in range(1, args.trials + 1):
+        if args.trials > 1:
+            events = deepcopy(original_events)
+        else:
+            events = original_events
         start = time.monotonic_ns() / 1000.0  # microseconds
         for ievt, event in enumerate(events, start=1):
             logger.info(f"Event {ievt} has {len(event)} particles")
@@ -67,13 +99,15 @@ def main():
                 logger.debug(f"{ijet}, {jet.rap}, {jet.phi}, {jet.pt}")
         end = time.monotonic_ns() / 1000.0
         benchmark.runtimes.append(end - start)
-        print(f"Processed {len(events)} events in {end-start:,.2f} us")
+        print(f"Trial {itrial}. Processed {len(events)} events in {end-start:,.2f} us")
         print(f"Time per event: {(end-start)/len(events):,.2f} us")
 
     if args.benchmark:
         with open(args.benchmark, mode="w") as benchmark_file:
             print(benchmark.to_json(), file=benchmark_file)
         logger.info(benchmark)
+        mean, stddev = benchmark.get_stats()
+        print(f"Mean time per event {mean:,.2f} ± {stddev:,.2f} us")
 
 
 if __name__ == "__main__":
@@ -86,6 +120,6 @@ if __name__ == "__main__":
     formatter = logging.Formatter("%(name)s: %(message)s")
     ch.setFormatter(formatter)
     logger.addHandler(ch)
-    logging.getLogger("pyantikt.tiledjetfinder").addHandler(ch)
+    logging.getLogger("jetfinder").addHandler(ch)
 
     main()
