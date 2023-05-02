@@ -1,6 +1,5 @@
 from pyantikt.nphistory import NPHistory
 from pyantikt.pseudojet import PseudoJet
-from pyantikt.nppseudojet import NPPseudoJets
 from pyantikt.nptiling import TilingDef, NPTiling
 
 import logging
@@ -10,43 +9,59 @@ import numpy.typing as npt
 logger = logging.getLogger("jetfinder")
 
 from numba import njit
-from copy import deepcopy
 from sys import float_info
+from math import trunc, floor
 
 Invalid = -3
 NonexistentParent = -2
 BeamJet = -1
 
-@njit
-def determine_rapidity_extent(minrap:npt.DTypeLike, maxrap:npt.DTypeLike, rap:npt.ArrayLike):
-    """Find the rapidity bining that gives a good distribution of initial
-    particles. Bins are always size 1, and the left and right hand bins (which
-    are "overflow" bins) also have ~0.25 of the maximum number of particles
-    in any bin."""
 
-    # Use the minimum and maximum rapidities to detemine the edge bins for counting
-    # initial bin populations (we care about the RHS of the low bin, LHS of the high bin)
-    min_rap_rhs = np.ceil(np.full(1, minrap))[0]
-    max_rap_lhs = np.ceil(np.full(1, maxrap))[0]
-    ibins = np.int64(max_rap_lhs - min_rap_rhs + 2)
+def determine_rapidity_extent(particles:list[PseudoJet]):
+    """ "Have a binning of rapidity that goes from -nrap to nrap
+    in bins of size 1; the left and right-most bins include
+    include overflows from smaller/larger rapidities"""
 
-    # print(minrap, maxrap, min_rap_rhs, max_rap_lhs)
+    if len(particles) == 0:
+        return 0.0, 0.0
 
-    # now bin the rapidity to decide how far to go with the tiling.
-    # Remember the bins go from ibin=0 (rap=-infinity..-floor(minrap))
-    # to ibins-1 (rap=floor(maxrap)..infinity)
-    bins = np.empty(ibins, dtype=float)
-    bins[1:-1] = np.arange(min_rap_rhs, max_rap_lhs)
-    bins[0] = np.finfo(np.float64).min
-    bins[-1] = np.finfo(np.float64).max
-    counts = np.histogram(rap, bins)[0]
-    # print(counts)
+    nrap = 20
+    nbins = 2 * nrap
+    counts = [0 for n in range(nbins)]
+
+    # get the minimum and maximum rapidities and at the same time bin
+    # the multiplicities as a function of rapidity to help decide how
+    # far out it's worth going
+    minrap = float_info.max
+    maxrap = -float_info.max
+
+    # As a timesaver, construct arrays of rapidity and phi here as we
+    # are paying the price of the event loop anyway
+    rap = np.empty(len(particles), dtype=float)
+    phi = np.empty(len(particles), dtype=float)
+
+    ibin = 0
+    for ip, p in enumerate(particles):
+        rap[ip] = p.rap
+        phi[ip] = p.phi
+
+        # ignore particles with infinite rapidity
+        if p.E == abs(p.pz):
+            continue
+
+        y = p.rap
+        minrap = min(minrap, y)
+        maxrap = max(maxrap, y)
+
+        # now bin the rapidity to decide how far to go with the tiling.
+        # Remember the bins go from ibin=0 (rap=-infinity..-19)
+        # to ibin = nbins-1 (rap=19..infinity for nrap=20)
+        # This Python construct is a 'clamp' function (ensure that we pick a value from 0 to nbins-1)
+        ibin = max(0, min(nbins - 1, trunc(y + nrap)))
+        counts[ibin] += 1
 
     # now figure out the particle count in the busiest bin
-    max_in_bin = np.max(counts)
-
-    # the edge bins should also contain at least min_multiplicity particles
-    min_multiplicity = np.int64(4)
+    max_in_bin = max(counts)
 
     # and find minrap, maxrap such that edge bin never contains more
     # than some fraction of busiest, and at least a few particles; first do
@@ -56,35 +71,149 @@ def determine_rapidity_extent(minrap:npt.DTypeLike, maxrap:npt.DTypeLike, rap:np
     # 2014-07-17: in some tests at high multiplicity (100k) and particles going up to
     #             about 7.3, anti-kt R=0.4, we found that 0.25 gave 20% better run times
     #             than the original value of 0.5.
-    allowed_max_fraction = np.float64(0.25)
-    allowed_max_cumul = allowed_max_fraction * max_in_bin
-    if allowed_max_cumul < min_multiplicity:
-        allowed_max_cumul = min_multiplicity
+    allowed_max_fraction = 0.25
 
-    min_bin = 0
-    cummulated_min_bin = counts[0]
-    while True:
-        min_bin += 1
-        cummulated_min_bin += counts[min_bin]
-        if cummulated_min_bin >= allowed_max_cumul:
+    # the edge bins should also contain at least min_multiplicity particles
+    min_multiplicity = 4
+
+    # now calculate how much we can accumulate into an edge bin
+    allowed_max_cumul = floor(max(max_in_bin * allowed_max_fraction, min_multiplicity))
+
+    # make sure we don't require more particles in a bin than max_in_bin
+    allowed_max_cumul = min(max_in_bin, allowed_max_cumul)
+
+    # Start scan over rapidity bins from the left, to find out minimum rapidity of tiling
+    # In this code, cumul2 isn't actually used anywhere
+    cumul_lo = 0.0
+    cumul2 = 0.0
+    ibin_lo = 0
+    while ibin_lo < nbins:
+        cumul_lo += counts[ibin_lo]
+        if cumul_lo >= allowed_max_cumul:
+            minrap = max(minrap, ibin_lo - nrap)
             break
-    setminrap = np.int64(min_rap_rhs + min_bin - 1)
+        ibin_lo += 1
+    if ibin_lo == nbins:
+        raise RuntimeError(
+            "Failed to find a low bin"
+        )  # internal consistency check that you found a bin
+    cumul2 += cumul_lo**2
 
-    max_bin = -1
-    cummulated_max_bin = counts[-1]
-    while True:
-        max_bin -= 1
-        cummulated_max_bin += counts[max_bin]
-        if cummulated_max_bin >= allowed_max_cumul:
+    # then do it from right, to find out maximum rapidity of tiling
+    cumul_hi = 0.0
+    ibin_hi = nbins - 1
+    while ibin_hi >= 0:
+        cumul_hi += counts[ibin_hi]
+        if cumul_hi >= allowed_max_cumul:
+            maxrap = min(maxrap, ibin_hi - nrap + 1)
             break
-    setmaxrap = np.int64(max_rap_lhs + max_bin + 1)
+        ibin_hi -= 1
+    if ibin_hi == -1:
+        raise RuntimeError(
+            "Failed to find a high bin"
+        )  # internal consistency check that you found a bin
 
-    # print(min_bin, cummulated_min_bin, max_bin, cummulated_max_bin)
-    # print(setminrap, setmaxrap)
+    # print(ibin_lo, cumul_lo, ibin_hi, cumul_hi)
 
-    return setminrap, setmaxrap
+    # consistency check
+    if ibin_hi < ibin_lo:
+        raise RuntimeError(
+            "Low/high bins inconsistent"
+        )  # internal consistency check that you found a bin
 
-def initial_tiling(npjets, Rparam=0.4):
+    # now work out cumul2
+    if ibin_hi == ibin_lo:
+        # if there is a single bin (potentially including overflows
+        # from both sides), cumul2 is the square of the total contents
+        # of that bin, which we obtain from cumul_lo and cumul_hi minus
+        # the double counting of part that is contained in both
+        # (putting double)
+        cumul2 = (cumul_lo + cumul_hi - counts[ibin_hi]) ** 2
+    else:
+        # otherwise we have a straightforward sum of squares of bin
+        # contents
+        cumul2 += cumul_hi**2
+
+    # now get the rest of the squared bin contents
+    for ibin in range(ibin_lo + 1, ibin_hi + 1):
+        cumul2 += counts[ibin] ** 2
+
+    return minrap, maxrap, rap, phi
+
+# def determine_rapidity_extent(jets:list[PseudoJet]):
+#     """Find the rapidity bining that gives a good distribution of initial
+#     particles. Bins are always size 1, and the left and right hand bins (which
+#     are "overflow" bins) also have ~0.25 of the maximum number of particles
+#     in any bin."""
+
+#     # Use the minimum and maximum rapidities to detemine the edge bins for counting
+#     # initial bin populations (we care about the RHS of the low bin, LHS of the high bin)
+#     min_rap_rhs = max_rap_lhs = 0
+#     for jet in jets:
+#         if jet.rap < min_rap_rhs:
+#             min_rap_rhs = np.ceil(jet.rap)
+#         if jet.rap > max_rap_lhs:
+#             max_rap_lhs = np.ceil(jet.rap)
+
+#     # min_rap_rhs = np.ceil(np.full(1, minrap))[0]
+#     # max_rap_lhs = np.ceil(np.full(1, maxrap))[0]
+#     ibins = np.int64(max_rap_lhs - min_rap_rhs + 2)
+
+#     # print(minrap, maxrap, min_rap_rhs, max_rap_lhs)
+
+#     # now bin the rapidity to decide how far to go with the tiling.
+#     # Remember the bins go from ibin=0 (rap=-infinity..-floor(minrap))
+#     # to ibins-1 (rap=floor(maxrap)..infinity)
+#     bins = np.empty(ibins, dtype=float)
+#     bins[1:-1] = np.arange(min_rap_rhs, max_rap_lhs)
+#     bins[0] = np.finfo(np.float64).min
+#     bins[-1] = np.finfo(np.float64).max
+#     counts = np.histogram(rap, bins)[0]
+#     # print(counts)
+
+#     # now figure out the particle count in the busiest bin
+#     max_in_bin = np.max(counts)
+
+#     # the edge bins should also contain at least min_multiplicity particles
+#     min_multiplicity = np.int64(4)
+
+#     # and find minrap, maxrap such that edge bin never contains more
+#     # than some fraction of busiest, and at least a few particles; first do
+#     # it from left. NB: the thresholds chosen here are largely
+#     # guesstimates as to what might work.
+#     #
+#     # 2014-07-17: in some tests at high multiplicity (100k) and particles going up to
+#     #             about 7.3, anti-kt R=0.4, we found that 0.25 gave 20% better run times
+#     #             than the original value of 0.5.
+#     allowed_max_fraction = np.float64(0.25)
+#     allowed_max_cumul = allowed_max_fraction * max_in_bin
+#     if allowed_max_cumul < min_multiplicity:
+#         allowed_max_cumul = min_multiplicity
+
+#     min_bin = 0
+#     cummulated_min_bin = counts[0]
+#     while True:
+#         min_bin += 1
+#         cummulated_min_bin += counts[min_bin]
+#         if cummulated_min_bin >= allowed_max_cumul:
+#             break
+#     setminrap = np.int64(min_rap_rhs + min_bin - 1)
+
+#     max_bin = -1
+#     cummulated_max_bin = counts[-1]
+#     while True:
+#         max_bin -= 1
+#         cummulated_max_bin += counts[max_bin]
+#         if cummulated_max_bin >= allowed_max_cumul:
+#             break
+#     setmaxrap = np.int64(max_rap_lhs + max_bin + 1)
+
+#     # print(min_bin, cummulated_min_bin, max_bin, cummulated_max_bin)
+#     # print(setminrap, setmaxrap)
+
+#     return setminrap, setmaxrap
+
+def initial_tiling(jets, Rparam=0.4):
     """Decide on a tiling strategy"""
 
     # first decide tile sizes (with a lower bound to avoid huge memory use with
@@ -104,8 +233,7 @@ def initial_tiling(npjets, Rparam=0.4):
 
     tile_size_phi = np.float64(2.0) * np.pi / n_tiles_phi  # >= Rparam and fits in 2pi
 
-    # Calling this function with broken out numpy types allows it to be jitted
-    tiles_rap_min, tiles_rap_max = determine_rapidity_extent(np.min(npjets.rap), np.max(npjets.rap), npjets.rap)
+    tiles_rap_min, tiles_rap_max, rap, phi = determine_rapidity_extent(jets)
     print(tiles_rap_min, tiles_rap_max)
 
     # now adjust the values
@@ -115,21 +243,21 @@ def initial_tiling(npjets, Rparam=0.4):
     tiles_rap_max = tiles_irap_max * tile_size_rap
     n_tiles_rap = np.int64(tiles_irap_max - tiles_irap_min + 1)
 
-    # print(tiles_rap_min,
-    #     tiles_rap_max,
-    #     tile_size_rap,
-    #     tile_size_phi,
-    #     n_tiles_rap,
-    #     n_tiles_phi,
-    #     tiles_irap_min,
-    #     tiles_irap_max,
-    # )
+    print(tiles_rap_min,
+        tiles_rap_max,
+        tile_size_rap,
+        tile_size_phi,
+        n_tiles_rap,
+        n_tiles_phi,
+        tiles_irap_min,
+        tiles_irap_max,
+    )
 
     # We need to do a quick scan, using the tiled definition to find out
     # how many jets we need to have space for in the tile, i.e., what's the
     # maximum value in any tile - we basically 2D historgam all the jets
     # and see what the maximum bin value is
-    myhist = np.histogram2d(npjets.rap, npjets.phi, bins=[n_tiles_rap, n_tiles_phi],
+    myhist = np.histogram2d(rap, phi, bins=[n_tiles_rap, n_tiles_phi],
                             range=[[tiles_rap_min, tile_size_rap * n_tiles_rap + tiles_rap_min], [0.0, 2*np.pi]])
     # Can cross check with original here
     # print(myhist)
@@ -150,7 +278,7 @@ def initial_tiling(npjets, Rparam=0.4):
 
     # allocate the tiles
     tiling = NPTiling(tiling_setup, max_jets_per_tile)
-    tiling.fill_with_jets(npjets)
+    tiling.fill_with_jets(jets, rap, phi)
 
     return tiling
 
@@ -178,6 +306,7 @@ def tile_self_scan(irap:np.int64, iphi:np.int64,
         _dist[islot] = R2 # Avoid measuring the distance 0 to myself!
         _dist[mask[irap,iphi]] = 1e20 # Don't consider any masked jets
         iclosejet = _dist.argmin()
+        # if dist[irap,iphi,islot] > _dist[iclosejet]:
         dist[irap,iphi,islot] = _dist[iclosejet]
         if iclosejet == islot:
             nn[irap,iphi,islot] = (-1,-1,-1)
@@ -185,6 +314,8 @@ def tile_self_scan(irap:np.int64, iphi:np.int64,
         else:
             nn[irap,iphi,islot] = (irap, iphi, iclosejet)
             akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[irap, iphi, iclosejet])
+            # Problem is that we are missing if another of the jets that we scan against would 
+            # have us as a minimum, even they are not our minimum!
             if dist[irap,iphi,iclosejet] > dist[irap,iphi,islot]:
                 nn[irap,iphi,iclosejet] = (irap,iphi,islot)
                 dist[irap,iphi,iclosejet] = dist[irap,iphi,islot]
@@ -209,6 +340,8 @@ def tile_comparison_scan(irap:np.int64, iphi:np.int64,
             dist[irap,iphi,islot] = close_dist
             nn[irap,iphi,islot] = (jrap,jphi,iclosejet)
             akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[jrap, jphi, iclosejet])
+        # Problem is that we are missing if another of the jets that we scan against would 
+        # have us as a minimum, even they are not our minimum!
         if dist[jrap,jphi,iclosejet] > close_dist:
             dist[jrap,jphi,iclosejet] = close_dist
             nn[jrap,jphi,iclosejet] = (irap,iphi,islot)
@@ -242,13 +375,14 @@ def find_closest_jets(akt_distance:npt.ArrayLike):
 def scan_for_newjet_nearest_neighbours(nptiling:NPTiling, newjetindex:tuple[int], R2:float):
     """Scan for nearest neighbours of a new merged jet"""
     # First, scan my own tile
-    print(f"Doing self scan for {newjetindex}")
+    print(f"Scanning {newjetindex[0]}, {newjetindex[1]}: ", end="")
     tile_self_scan(irap=newjetindex[0], iphi=newjetindex[1],
                    rap=nptiling.rap, phi=nptiling.phi,
                    inv_pt2=nptiling.inv_pt2, nn=nptiling.nn,
                    dist=nptiling.dist,
                    akt_dist=nptiling.akt_dist, mask=nptiling.mask,
                    R2=R2)
+    print(f"{nptiling.dist[newjetindex]}, {nptiling.akt_dist[newjetindex]} to {nptiling.nn[newjetindex]}")
 
     # Now scan neighboring tiles
     # N.B. this is all tiles, not just rightmost
@@ -256,7 +390,6 @@ def scan_for_newjet_nearest_neighbours(nptiling:NPTiling, newjetindex:tuple[int]
         for diphi in range(-1,2):
             jrap = newjetindex[0] + dirap
             jphi = newjetindex[1] + diphi
-            print(f"Scanning {jrap}, {jphi} ({dirap}, {diphi})")
             if jrap < 0 or jrap > nptiling.setup.n_tiles_rap-1:
                 continue
             if dirap==0 and diphi==0:
@@ -265,52 +398,33 @@ def scan_for_newjet_nearest_neighbours(nptiling:NPTiling, newjetindex:tuple[int]
                 jphi = nptiling.setup.n_tiles_phi-1
             if jphi > nptiling.setup.n_tiles_phi-1:
                 jphi =0
-            print(f"Scanning {jrap}, {jphi}")
+            print(f"Scanning {jrap}, {jphi}: ", end="")
             tile_comparison_scan(irap=newjetindex[0], iphi=newjetindex[1], jrap=jrap, jphi=jphi,
                 rap=nptiling.rap, phi=nptiling.phi,
                 inv_pt2=nptiling.inv_pt2, nn=nptiling.nn,
                 dist=nptiling.dist,
                 akt_dist=nptiling.akt_dist, mask=nptiling.mask,
                 R2=R2)
+            print(f"{nptiling.dist[newjetindex]}, {nptiling.akt_dist[newjetindex]} to {nptiling.nn[newjetindex]}")
 
-# @njit
-# def scan_for_my_nearest_neighbours(ijet:int, phi:npt.ArrayLike, 
-#                                    rap:npt.ArrayLike, inv_pt2:npt.ArrayLike, 
-#                                    dist:npt.ArrayLike, akt_dist:npt.ArrayLike, nn:npt.ArrayLike, 
-#                                    mask:npt.ArrayLike, R2: float):
-#     '''Retest all other jets against the target jet'''
-#     nn[ijet] = -1
-#     dist[ijet] = R2
-#     _dphi = np.pi - np.abs(np.pi - np.abs(phi - phi[ijet]))
-#     _drap = rap - rap[ijet]
-#     _dist = _dphi*_dphi + _drap*_drap
-#     _dist[ijet] = R2 # Avoid measuring the distance 0 to myself!
-#     _dist[mask] = 1e20 # Don't consider any masked jets
-#     iclosejet = _dist.argmin()
-#     dist[ijet] = _dist[iclosejet]
-#     if iclosejet == ijet:
-#         nn[ijet] = -1
-#         akt_dist[ijet] = dist[ijet] * inv_pt2[ijet]
-#     else:
-#         nn[ijet] = iclosejet
-#         akt_dist[ijet] = dist[ijet] * (inv_pt2[ijet] if inv_pt2[ijet] < inv_pt2[iclosejet] else inv_pt2[iclosejet])
-#         # As this function is called on new PseudoJets it's possible
-#         # that we are now the NN of our NN
-#         if dist[iclosejet] > dist[ijet]:
-#             dist[iclosejet] = dist[ijet]
-#             nn[iclosejet] = ijet
-#             akt_dist[iclosejet] = dist[iclosejet] * (inv_pt2[ijet] if inv_pt2[ijet] < inv_pt2[iclosejet] else inv_pt2[iclosejet])
-
-
-def compare_status(working:NPPseudoJets, test:NPPseudoJets):
-    '''Test two different copies of numpy pseudojet containers that should be equal'''
-    dist_diff = working.akt_dist!=test.akt_dist
-    idist_diff = np.where(dist_diff)
-    if len(idist_diff[0]) > 0:
-        print(f"Differences found after full scan of NNs: {idist_diff[0]}")
-        for ijet in idist_diff[0]:
-            print(f"{ijet}\nW: {working.print_jet(ijet)}\nT: {test.print_jet(ijet)}")
-        raise RuntimeError("Jet sets are not the same and they should be!")
+def do_debug_scan(nptiling:NPTiling, ijet):
+    print(f"Debug scan on ", end="")
+    nptiling.dump_jet(ijet)
+    print(f"NN Tiles: {nptiling.righttiles[ijet[0], ijet[1]]}")
+    min_dist = 1e20
+    nn = (-1,-1,-1)
+    for irap in range(nptiling.setup.n_tiles_rap):
+        for iphi in range(nptiling.setup.n_tiles_phi):
+            for islot in np.where(nptiling.mask[irap,iphi]==False)[0]:
+                _dphi = np.pi - np.abs(np.pi - np.abs(nptiling.phi[ijet] - nptiling.phi[irap,iphi,islot]))
+                _drap = nptiling.rap[ijet] - nptiling.rap[irap,iphi,islot]
+                _dist = _dphi*_dphi + _drap*_drap
+                print(f"{irap},{iphi},{islot} -> {_dist}: ", end="")
+                nptiling.dump_jet((irap,iphi,islot))
+                if min_dist > _dist and (irap != ijet[0] or iphi != ijet[1] or islot != ijet[2]):
+                    min_dist = _dist
+                    nn = (irap, iphi, islot)
+    print(f"Got minimum distance {min_dist} to {nn}")
 
 
 def add_step_to_history(history: NPHistory, jets: list[PseudoJet], 
@@ -329,7 +443,7 @@ def add_step_to_history(history: NPHistory, jets: list[PseudoJet],
                                     max_dij_so_far=max_dij_so_far)
 
     local_step = history.next-1
-    logger.debug(f"Added history step {local_step}: {history.parent1[local_step]}")
+    logger.debug(f"Added history step {local_step}: {parent1}, {parent2}, {distance}")
 
     if parent1 >= 0:
         if history.child[parent1] != -1:
@@ -386,12 +500,12 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
 
     # Create the numpy arrays corresponding to the pseudojets that will be used
     # for fast calculations
-    npjets = NPPseudoJets(len(jets))
-    npjets.set_jets(jets)
+    # npjets = NPPseudoJets(len(jets))
+    # npjets.set_jets(jets)
 
     # We scan the list of inital particles, setting up an appropriate
     # tiling structure and filling it with our initial particles
-    nptiling = initial_tiling(npjets, Rparam)
+    nptiling = initial_tiling(jets, Rparam)
 
     # Setup the initial nearest neighbours
     scan_for_all_nearest_neighbours(nptiling, R2)
@@ -402,17 +516,18 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
     for iteration in range(len(initial_particles)):
         distance, ijetA = find_closest_jets(nptiling.akt_dist)
         ijetB = tuple(nptiling.nn[ijetA]) # Seems we need to force this to a tuple!
+        # print(f"-> {ijetA} {nptiling.nn[ijetA]} {nptiling.dist[ijetA]} {nptiling.akt_dist[ijetA]}")
+        # print(f"-> {ijetB} {nptiling.nn[ijetB]} {nptiling.dist[ijetB]} {nptiling.akt_dist[ijetB]}")
         # Add normalisation for real distance
         distance *= invR2
 
-        print(f"{ijetA} and {ijetB} - distance {distance}")
-
         if (ijetB[0] >= 0):
-            logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA} and jet {ijetB}")
             jet_indexA = nptiling.jets_index[ijetA]
             jet_indexB = nptiling.jets_index[ijetB]
-
-            logger.debug(f"Mapping to {jet_indexA} and {jet_indexB}")
+            logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA}={jet_indexA} and jet {ijetB}={jet_indexB}")
+            if jet_indexB == -1:
+                nptiling.dump_jet(ijetB)
+                exit(0)
 
             # Mask jets
             nptiling.mask_slot(ijetA)
@@ -421,36 +536,54 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
             # Create merged jet
             merged_jet = jets[jet_indexA] + jets[jet_indexB]
             imerged_jet = len(jets)
+            merged_jet.cluster_history_index = imerged_jet
             jets.append(merged_jet)
 
             # Insert the merged jet
             add_step_to_history(history=history, jets=jets, 
-                                parent1=jets[jet_indexA].cluster_hist_index,
-                                parent2=jets[jet_indexB].cluster_hist_index,
+                                parent1=jets[jet_indexA].cluster_history_index,
+                                parent2=jets[jet_indexB].cluster_history_index,
                                 jetp_index=imerged_jet, distance=distance)
 
             newjetindex = nptiling.insert_jet(merged_jet, npjet_index=imerged_jet)
+            # print(nptiling.righttiles[newjetindex[0], newjetindex[1]])
 
             # Get the NNs for the merged pseudojet
             # Note, this rescans the whole tile and all neighbours
-            scan_for_newjet_nearest_neighbours(nptiling, newjetindex, R2)
-            exit(0)
+            # scan_for_newjet_nearest_neighbours(nptiling, newjetindex, R2)
         else:
-            logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA} and jet (-1,-1,-1)")
             jet_indexA = nptiling.jets_index[ijetA]
-            logger.debug(f"Mapping to {jet_indexA} and -1")
+            logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA}={jet_indexA} and jet (-1,-1,-1)=-1")
             # Beamjet
             nptiling.mask_slot(ijetA)
-            jet_indexA = nptiling.jets_index[ijetA]
-            add_step_to_history(history=history, jets=jets, parent1=jets[jet_indexA].cluster_hist_index, 
+            add_step_to_history(history=history, jets=jets, 
+                                parent1=jets[jet_indexA].cluster_history_index, 
                                 parent2=BeamJet, 
                                 jetp_index=Invalid, distance=distance)
+
+        # Fallback to full scan with reset of distances
+        nptiling.dist.fill(1e20)
+        nptiling.akt_dist.fill(1e20)
+        nptiling.nn[0].fill(-1) 
+        nptiling.nn[1].fill(-1)
+        nptiling.nn[2].fill(-1)
+        scan_for_all_nearest_neighbours(nptiling, R2)
 
         # If there are any remiaining active jets which have ijetA or ijetB as their nearest
         # neighbour, then we need to rescan for them. Mostly this should be taken care of by
         # any new pseudojet scan in the case of a merger, but we need to check
-
-
+        # print(np.where(nptiling.nn==jet_indexA))
+        # jets_to_update = np.where(nptiling.nn==jet_indexA)
+        # tiles_to_update = set()
+        # for irap, iphi, _ in zip(jets_to_update[0], jets_to_update[1], jets_to_update[2]):
+        #     tiles_to_update.add((irap, iphi))
+        # # print(tiles_to_update)
+        # for tile in tiles_to_update:
+        #     scan_for_newjet_nearest_neighbours(nptiling, (tile[0], tile[1], 0), R2)
+        if (iteration==7):
+            do_debug_scan(nptiling, (28,6,0))
+            do_debug_scan(nptiling, (28,5,3))        
+            exit(0)
 
         # Now need to update nearest distances, when pseudojets are unmasked and
         # had either jetA or jetB as their nearest neighbour

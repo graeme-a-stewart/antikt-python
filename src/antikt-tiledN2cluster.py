@@ -21,6 +21,7 @@ except ImportError as e:
     print(f"pyantikt.acceleratedtiledjetfinder unavailable: {e}")
 import pyantikt.tiledjetfinder
 
+
 def main():
     parser = argparse.ArgumentParser(description="Tiled N^2 AntiKt Jet Finder")
     parser.add_argument(
@@ -65,7 +66,9 @@ def main():
     # Switch between implenentations here
     if args.numba:
         try:
-            faster_tiled_N2_cluster = pyantikt.acceleratedtiledjetfinder.faster_tiled_N2_cluster
+            faster_tiled_N2_cluster = (
+                pyantikt.acceleratedtiledjetfinder.faster_tiled_N2_cluster
+            )
         except AttributeError as e:
             raise RuntimeError(
                 "Numba accelerated code requested, but it's unavailable"

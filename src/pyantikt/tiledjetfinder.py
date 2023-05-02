@@ -12,7 +12,7 @@ from pyantikt.tiles import (
 from pyantikt.history import HistoryElement, ClusterSequence, initial_history
 
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("jetfinder")
 
 Invalid = -3
 NonexistentParent = -2
@@ -121,6 +121,8 @@ def determine_rapidity_extent(particles):
             "Failed to find a high bin"
         )  # internal consistency check that you found a bin
 
+    # print(ibin_lo, cumul_lo, ibin_hi, cumul_hi)
+
     # consistency check
     if ibin_hi < ibin_lo:
         raise RuntimeError(
@@ -171,6 +173,18 @@ def initial_tiling(particles, Rparam=0.4):
     tiles_eta_min = tiles_ieta_min * tile_size_eta
     tiles_eta_max = tiles_ieta_max * tile_size_eta
     n_tiles_eta = tiles_ieta_max - tiles_ieta_min + 1
+
+    # print(
+    #     tiles_eta_min,
+    #     tiles_eta_max,
+    #     tile_size_eta,
+    #     tile_size_phi,
+    #     n_tiles_eta,
+    #     n_tiles_phi,
+    #     tiles_ieta_min,
+    #     tiles_ieta_max,
+    # )
+    # exit(0)
 
     tiling_setup = TilingDef(
         tiles_eta_min,
