@@ -70,6 +70,36 @@ class NPTiling:
                 else:
                     self.righttiles[irap,iphi,3] = (irap+1,iphi+1 if iphi != setup.n_tiles_phi-1 else 0)
 
+        # This tuple holds all the neighbour tiles of any tile
+        # N.B. phi wraps, but rap does not
+        # If an entry is (-1,-1) it's an invalid neighbour
+        # The 8 members of this array scan increasing phi and increasing rapidity
+        #      0  1  2
+        #      3  X  4
+        #      5  6  7
+        self.neighbourtiles = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, 8), dtype=(np.int64, 2))
+        for irap in range(setup.n_tiles_rap):
+            for iphi in range(setup.n_tiles_phi):
+                self.neighbourtiles[irap,iphi,0] = (irap-1,iphi-1)
+                self.neighbourtiles[irap,iphi,1] = (irap-1,iphi)
+                self.neighbourtiles[irap,iphi,2] = (irap-1,iphi+1)
+                self.neighbourtiles[irap,iphi,3] = (irap  ,iphi-1)
+                self.neighbourtiles[irap,iphi,4] = (irap  ,iphi+1)
+                self.neighbourtiles[irap,iphi,5] = (irap+1,iphi-1)
+                self.neighbourtiles[irap,iphi,6] = (irap+1,iphi)
+                self.neighbourtiles[irap,iphi,7] = (irap+1,iphi+1)
+                for neighbour in self.neighbourtiles[irap,iphi]:
+                    if neighbour[0] < 0:
+                        neighbour[1] = -1
+                    elif neighbour[0] > setup.n_tiles_rap-1:
+                        neighbour[0] = neighbour[1] = -1
+                    elif neighbour[1] < 0:
+                        neighbour[1] = setup.n_tiles_phi-1
+                    elif neighbour[1] > setup.n_tiles_phi-1:
+                        neighbour[1] = 0
+        #         print(f"{irap},{iphi} {self.neighbourtiles[irap,iphi]}")
+        # exit(0)
+
     def fill_with_jets(self, jets:list[PseudoJet], rap, phi):
         # First bulk calculate the bin indexes we need to use
         _irap, _iphi = get_tile_indexes(self.setup.tiles_rap_min, 

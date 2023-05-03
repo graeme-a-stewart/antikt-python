@@ -316,10 +316,10 @@ def tile_self_scan(irap:np.int64, iphi:np.int64,
             akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[irap, iphi, iclosejet])
             # Problem is that we are missing if another of the jets that we scan against would 
             # have us as a minimum, even they are not our minimum!
-            if dist[irap,iphi,iclosejet] > dist[irap,iphi,islot]:
-                nn[irap,iphi,iclosejet] = (irap,iphi,islot)
-                dist[irap,iphi,iclosejet] = dist[irap,iphi,islot]
-                akt_dist[irap,iphi,islot] = akt_dist[irap,iphi,islot]
+            # if dist[irap,iphi,iclosejet] > dist[irap,iphi,islot]:
+            #     nn[irap,iphi,iclosejet] = (irap,iphi,islot)
+            #     dist[irap,iphi,iclosejet] = dist[irap,iphi,islot]
+            #     akt_dist[irap,iphi,islot] = akt_dist[irap,iphi,islot]
 
 @njit
 def tile_comparison_scan(irap:np.int64, iphi:np.int64,
@@ -342,10 +342,10 @@ def tile_comparison_scan(irap:np.int64, iphi:np.int64,
             akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[jrap, jphi, iclosejet])
         # Problem is that we are missing if another of the jets that we scan against would 
         # have us as a minimum, even they are not our minimum!
-        if dist[jrap,jphi,iclosejet] > close_dist:
-            dist[jrap,jphi,iclosejet] = close_dist
-            nn[jrap,jphi,iclosejet] = (irap,iphi,islot)
-            akt_dist[jrap,jphi,iclosejet] = akt_dist[irap,iphi,islot]
+        # if dist[jrap,jphi,iclosejet] > close_dist:
+        #     dist[jrap,jphi,iclosejet] = close_dist
+        #     nn[jrap,jphi,iclosejet] = (irap,iphi,islot)
+        #     akt_dist[jrap,jphi,iclosejet] = akt_dist[irap,iphi,islot]
 
 def scan_for_all_nearest_neighbours(nptiling:NPTiling, R2:npt.DTypeLike):
     """Scan over all tiles, working down and to the right, making
@@ -357,8 +357,8 @@ def scan_for_all_nearest_neighbours(nptiling:NPTiling, R2:npt.DTypeLike):
                             dist=nptiling.dist, akt_dist=nptiling.akt_dist,
                             mask=nptiling.mask, R2=R2)
 
-            # Now we scan all of the rightmost neighbour tiles
-            for jrap, jphi in nptiling.righttiles[irap,iphi]:
+            # Now we scan all of the neighbour tiles
+            for jrap, jphi in nptiling.neighbourtiles[irap,iphi]:
                 if jrap == -1:
                     continue
                 tile_comparison_scan(irap=irap, iphi=iphi, jrap=jrap, jphi=jphi,
@@ -465,7 +465,7 @@ def add_step_to_history(history: NPHistory, jets: list[PseudoJet],
 
     # get cross-referencing right from PseudoJets
     if jetp_index >= 0:
-        jets[jetp_index].cluster_hist_index = local_step
+        jets[jetp_index].cluster_history_index = local_step
 
 def inclusive_jets(jets: list[PseudoJet], history: NPHistory, ptmin:float=0.0):
     '''return all inclusive jets of a ClusterSequence with pt > ptmin'''
@@ -580,10 +580,10 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
         # # print(tiles_to_update)
         # for tile in tiles_to_update:
         #     scan_for_newjet_nearest_neighbours(nptiling, (tile[0], tile[1], 0), R2)
-        if (iteration==7):
-            do_debug_scan(nptiling, (28,6,0))
-            do_debug_scan(nptiling, (28,5,3))        
-            exit(0)
+        # if (iteration==7):
+        #     do_debug_scan(nptiling, (28,6,0))
+        #     do_debug_scan(nptiling, (28,5,3))        
+        #     exit(0)
 
         # Now need to update nearest distances, when pseudojets are unmasked and
         # had either jetA or jetB as their nearest neighbour
