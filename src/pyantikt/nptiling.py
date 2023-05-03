@@ -125,7 +125,7 @@ class NPTiling:
             self.nn[_irap[ijet], _iphi[ijet], islot] = (-1,-1,-1)
             self.mask[_irap[ijet], _iphi[ijet], islot] = False
             self.jets_index[_irap[ijet], _iphi[ijet], islot] = ijet
-            print(f"Set jet {ijet} into ({_irap[ijet]}, {_iphi[ijet]}, {islot})")
+            # print(f"Set jet {ijet} into ({_irap[ijet]}, {_iphi[ijet]}, {islot})")
 
     def mask_slot(self, ijet:tuple[int]):
         self.mask[ijet] = True
@@ -154,7 +154,7 @@ class NPTiling:
         self.nn[_irap, _iphi, islot] = [-1,-1,-1]
         self.mask[_irap, _iphi, islot] = False
         self.jets_index[_irap, _iphi, islot] = npjet_index
-        print(f"Added new jet {npjet_index} to ({_irap}, {_iphi}, {islot})")
+        # print(f"Added new jet {npjet_index} to ({_irap}, {_iphi}, {islot})")
         return _irap, _iphi, islot
     
     def dump_jet(self, ijet:tuple[int]):

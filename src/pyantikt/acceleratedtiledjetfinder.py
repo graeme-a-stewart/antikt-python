@@ -234,7 +234,7 @@ def initial_tiling(jets, Rparam=0.4):
     tile_size_phi = np.float64(2.0) * np.pi / n_tiles_phi  # >= Rparam and fits in 2pi
 
     tiles_rap_min, tiles_rap_max, rap, phi = determine_rapidity_extent(jets)
-    print(tiles_rap_min, tiles_rap_max)
+    # print(tiles_rap_min, tiles_rap_max)
 
     # now adjust the values
     tiles_irap_min = np.int64(np.floor(tiles_rap_min / tile_size_rap))
@@ -243,15 +243,15 @@ def initial_tiling(jets, Rparam=0.4):
     tiles_rap_max = tiles_irap_max * tile_size_rap
     n_tiles_rap = np.int64(tiles_irap_max - tiles_irap_min + 1)
 
-    print(tiles_rap_min,
-        tiles_rap_max,
-        tile_size_rap,
-        tile_size_phi,
-        n_tiles_rap,
-        n_tiles_phi,
-        tiles_irap_min,
-        tiles_irap_max,
-    )
+    # print(tiles_rap_min,
+    #     tiles_rap_max,
+    #     tile_size_rap,
+    #     tile_size_phi,
+    #     n_tiles_rap,
+    #     n_tiles_phi,
+    #     tiles_irap_min,
+    #     tiles_irap_max,
+    # )
 
     # We need to do a quick scan, using the tiled definition to find out
     # how many jets we need to have space for in the tile, i.e., what's the
@@ -263,7 +263,7 @@ def initial_tiling(jets, Rparam=0.4):
     # print(myhist)
 
     max_jets_per_tile = np.int64(np.max(myhist[0]))
-    print(f"Max jets per tile: {max_jets_per_tile}")
+    # print(f"Max jets per tile: {max_jets_per_tile}")
 
     tiling_setup = TilingDef(
         tiles_rap_min,
@@ -449,22 +449,22 @@ def add_step_to_history(history: NPHistory, jets: list[PseudoJet],
     local_step = history.next-1
     logger.debug(f"Added history step {local_step}: {parent1}, {parent2}, {distance}")
 
-    if parent1 >= 0:
-        if history.child[parent1] != -1:
-            raise (
-                RuntimeError(
-                    f"Internal error. Trying to recombine a parent1 object that has previsously been recombined: {parent1}"
-                )
-            )
+    # if parent1 >= 0:
+    #     if history.child[parent1] != -1:
+    #         raise (
+    #             RuntimeError(
+    #                 f"Internal error. Trying to recombine a parent1 object that has previsously been recombined: {parent1}"
+    #             )
+    #         )
     history.child[parent1] = local_step
 
-    if parent2 >= 0:
-        if history.child[parent2] != -1:
-            raise (
-                RuntimeError(
-                    f"Internal error. Trying to recombine a parent1 object that has previsously been recombined: {parent2}"
-                )
-            )
+    # if parent2 >= 0:
+    #     if history.child[parent2] != -1:
+    #         raise (
+    #             RuntimeError(
+    #                 f"Internal error. Trying to recombine a parent1 object that has previsously been recombined: {parent2}"
+    #             )
+    #         )
     history.child[parent2] = local_step
 
     # get cross-referencing right from PseudoJets
@@ -529,9 +529,9 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
             jet_indexA = nptiling.jets_index[ijetA]
             jet_indexB = nptiling.jets_index[ijetB]
             logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA}={jet_indexA} and jet {ijetB}={jet_indexB}")
-            if jet_indexB == -1:
-                nptiling.dump_jet(ijetB)
-                exit(0)
+            # if jet_indexB == -1:
+            #     nptiling.dump_jet(ijetB)
+            #     exit(0)
 
             # Mask jets
             nptiling.mask_slot(ijetA)
@@ -555,7 +555,7 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
             # Get the NNs for the merged pseudojet
             # Note, this rescans the whole tile and all neighbours
             scan_for_tile_nearest_neighbours(nptiling, newjetindex, R2)
-            scan_neighbour_tiles(nptiling, newjetindex, R2)
+            # scan_neighbour_tiles(nptiling, newjetindex, R2)
             # Saftey - also might have to rescan A or B, if these are not the same tile as
             # the merged jet
             if (ijetA[:2] != newjetindex[:2]):
