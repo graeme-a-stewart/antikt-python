@@ -297,6 +297,9 @@ def tile_self_scan(irap:np.int64, iphi:np.int64,
                    mask:npt.ArrayLike, R2:npt.DTypeLike):
     """Scan a tile for it's own nearest neighbours"""
     for islot in np.where(mask[irap,iphi]==False)[0]:
+        # Saftey first...
+        dist[irap,iphi,islot] = R2
+        nn[irap,iphi,islot] = (-1,-1,-1)
         # print(islot, type(islot))
         # _myphi = phi[irap,iphi,islot]
         # print(_myphi, type(_myphi))
@@ -372,40 +375,41 @@ def find_closest_jets(akt_distance:npt.ArrayLike):
     return akt_distance[minimum_distance_index], minimum_distance_index
 
 
-def scan_for_newjet_nearest_neighbours(nptiling:NPTiling, newjetindex:tuple[int], R2:float):
-    """Scan for nearest neighbours of a new merged jet"""
+def scan_for_tile_nearest_neighbours(nptiling:NPTiling, newjetindex:tuple[int], R2:float):
+    """Scan for nearest neighbours of a tile"""
     # First, scan my own tile
-    print(f"Scanning {newjetindex[0]}, {newjetindex[1]}: ", end="")
-    tile_self_scan(irap=newjetindex[0], iphi=newjetindex[1],
+    # print(f"Rescanning {newjetindex[0]}, {newjetindex[1]}")
+    irap = newjetindex[0]
+    iphi = newjetindex[1]
+    tile_self_scan(irap=irap, iphi=iphi,
                    rap=nptiling.rap, phi=nptiling.phi,
                    inv_pt2=nptiling.inv_pt2, nn=nptiling.nn,
                    dist=nptiling.dist,
                    akt_dist=nptiling.akt_dist, mask=nptiling.mask,
                    R2=R2)
-    print(f"{nptiling.dist[newjetindex]}, {nptiling.akt_dist[newjetindex]} to {nptiling.nn[newjetindex]}")
+    # print(f"{nptiling.dist[newjetindex]}, {nptiling.akt_dist[newjetindex]} to {nptiling.nn[newjetindex]}")
 
-    # Now scan neighboring tiles
-    # N.B. this is all tiles, not just rightmost
-    for dirap in range(-1,2):
-        for diphi in range(-1,2):
-            jrap = newjetindex[0] + dirap
-            jphi = newjetindex[1] + diphi
-            if jrap < 0 or jrap > nptiling.setup.n_tiles_rap-1:
-                continue
-            if dirap==0 and diphi==0:
-                continue
-            if jphi < 0:
-                jphi = nptiling.setup.n_tiles_phi-1
-            if jphi > nptiling.setup.n_tiles_phi-1:
-                jphi =0
-            print(f"Scanning {jrap}, {jphi}: ", end="")
-            tile_comparison_scan(irap=newjetindex[0], iphi=newjetindex[1], jrap=jrap, jphi=jphi,
-                rap=nptiling.rap, phi=nptiling.phi,
-                inv_pt2=nptiling.inv_pt2, nn=nptiling.nn,
-                dist=nptiling.dist,
-                akt_dist=nptiling.akt_dist, mask=nptiling.mask,
-                R2=R2)
-            print(f"{nptiling.dist[newjetindex]}, {nptiling.akt_dist[newjetindex]} to {nptiling.nn[newjetindex]}")
+    # Now scan from my tile to surrounding tiles
+    for jrap, jphi in nptiling.neighbourtiles[irap,iphi]:
+        if jrap == -1:
+            continue
+        tile_comparison_scan(irap=irap, iphi=iphi, jrap=jrap, jphi=jphi,
+                                rap=nptiling.rap, phi=nptiling.phi, 
+                    inv_pt2=nptiling.inv_pt2, nn=nptiling.nn, 
+                    dist=nptiling.dist, akt_dist=nptiling.akt_dist,
+                    mask=nptiling.mask, R2=R2)
+
+def scan_neighbour_tiles(nptiling:NPTiling, newjetindex:tuple[int], R2:float):
+    """Scan back from my neighbour tiles, because my tile was updated and we
+    could have an NN in a neighbour that's no longer valid"""
+    # print(f"Rescanning neighbours of {newjetindex[0]}, {newjetindex[1]}")
+    irap = newjetindex[0]
+    iphi = newjetindex[1]
+    for jrap, jphi in nptiling.neighbourtiles[irap,iphi]:
+        if jrap == -1:
+            continue
+        scan_for_tile_nearest_neighbours(nptiling, (jrap,jphi,0), R2)
+
 
 def do_debug_scan(nptiling:NPTiling, ijet):
     print(f"Debug scan on ", end="")
@@ -550,7 +554,17 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
 
             # Get the NNs for the merged pseudojet
             # Note, this rescans the whole tile and all neighbours
-            # scan_for_newjet_nearest_neighbours(nptiling, newjetindex, R2)
+            scan_for_tile_nearest_neighbours(nptiling, newjetindex, R2)
+            scan_neighbour_tiles(nptiling, newjetindex, R2)
+            # Saftey - also might have to rescan A or B, if these are not the same tile as
+            # the merged jet
+            if (ijetA[:2] != newjetindex[:2]):
+                scan_for_tile_nearest_neighbours(nptiling, ijetA, R2)
+            if (ijetB[:2] != newjetindex[:2]):
+               if (ijetA[:2] != ijetB[:2]):
+                scan_for_tile_nearest_neighbours(nptiling, ijetB, R2)
+
+
         else:
             jet_indexA = nptiling.jets_index[ijetA]
             logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA}={jet_indexA} and jet (-1,-1,-1)=-1")
@@ -560,26 +574,36 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
                                 parent1=jets[jet_indexA].cluster_history_index, 
                                 parent2=BeamJet, 
                                 jetp_index=Invalid, distance=distance)
+            
+            # We need to rescan based on the tile where this jet was removed only
+            scan_for_tile_nearest_neighbours(nptiling, ijetA, R2)
 
         # Fallback to full scan with reset of distances
-        nptiling.dist.fill(1e20)
-        nptiling.akt_dist.fill(1e20)
-        nptiling.nn[0].fill(-1) 
-        nptiling.nn[1].fill(-1)
-        nptiling.nn[2].fill(-1)
-        scan_for_all_nearest_neighbours(nptiling, R2)
+        # nptiling.dist.fill(1e20)
+        # nptiling.akt_dist.fill(1e20)
+        # nptiling.nn[0].fill(-1) 
+        # nptiling.nn[1].fill(-1)
+        # nptiling.nn[2].fill(-1)
+        # scan_for_all_nearest_neighbours(nptiling, R2)
 
         # If there are any remiaining active jets which have ijetA or ijetB as their nearest
         # neighbour, then we need to rescan for them. Mostly this should be taken care of by
         # any new pseudojet scan in the case of a merger, but we need to check
-        # print(np.where(nptiling.nn==jet_indexA))
+        
         # jets_to_update = np.where(nptiling.nn==jet_indexA)
+        # print(f"To update: {jets_to_update}")
         # tiles_to_update = set()
-        # for irap, iphi, _ in zip(jets_to_update[0], jets_to_update[1], jets_to_update[2]):
+        # for ijet in jets_to_update:
+        #     print(f"-> {ijet}: {nptiling.dump_jet(tuple(ijet))}")
+        # exit(0)
+
+        # for irap, iphi, islot in zip(jets_to_update[0], jets_to_update[1], jets_to_update[2]):
+        #     print(f"Jet to update {irap},{iphi},{islot}: {nptiling.dump_jet((irap,iphi,islot))}")
         #     tiles_to_update.add((irap, iphi))
         # # print(tiles_to_update)
         # for tile in tiles_to_update:
         #     scan_for_newjet_nearest_neighbours(nptiling, (tile[0], tile[1], 0), R2)
+
         # if (iteration==7):
         #     do_debug_scan(nptiling, (28,6,0))
         #     do_debug_scan(nptiling, (28,5,3))        
