@@ -123,7 +123,7 @@ def add_step_to_history(history: NPHistory, jets: list[PseudoJet],
 
     # get cross-referencing right from PseudoJets
     if jetp_index >= 0:
-        jets[jetp_index].cluster_hist_index = local_step
+        jets[jetp_index].cluster_history_index = local_step
 
 def inclusive_jets(jets: list[PseudoJet], history: NPHistory, ptmin:float=0.0):
     '''return all inclusive jets of a ClusterSequence with pt > ptmin'''
@@ -195,8 +195,8 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
             # We recycle the slot of jetA (which is the lowest slot)
             npjets.insert_jet(merged_jet, slot=ijetA, jet_index=imerged_jet)
             add_step_to_history(history=history, jets=jets, 
-                                parent1=jets[jet_indexA].cluster_hist_index,
-                                parent2=jets[jet_indexB].cluster_hist_index,
+                                parent1=jets[jet_indexA].cluster_history_index,
+                                parent2=jets[jet_indexB].cluster_history_index,
                                 jetp_index=imerged_jet, distance=distance)
             
             # Get the NNs for the merged pseudojet
@@ -207,7 +207,7 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
             # Beamjet
             npjets.mask_slot(ijetA)
             jet_indexA = npjets.jets_index[ijetA]
-            add_step_to_history(history=history, jets=jets, parent1=jets[jet_indexA].cluster_hist_index, 
+            add_step_to_history(history=history, jets=jets, parent1=jets[jet_indexA].cluster_history_index, 
                                 parent2=BeamJet, 
                                 jetp_index=Invalid, distance=distance)
 

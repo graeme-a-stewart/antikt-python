@@ -58,7 +58,7 @@ class NPHistory:
         Qtot = 0.0
         for ijet, jet in enumerate(jets):
             self.jetp_index[ijet] = ijet
-            jet.cluster_hist_index = ijet
+            jet.cluster_history_index = ijet
             Qtot = jet.E
         
         self.next = len(jets)

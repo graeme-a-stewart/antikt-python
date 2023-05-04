@@ -135,7 +135,7 @@ def add_step_to_history(history: list[HistoryElement], jets: list[PseudoJet],
 
     # get cross-referencing right from PseudoJets
     if jetp_index >= 0:
-        jets[jetp_index].cluster_hist_index = local_step
+        jets[jetp_index].cluster_history_index = local_step
 
 def inclusive_jets(jets: list[PseudoJet], history: list[HistoryElement], ptmin:float=0.0):
     '''return all inclusive jets of a ClusterSequence with pt > ptmin'''
@@ -191,8 +191,8 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
             jets.append(merged_jet)
 
             add_step_to_history(history=history, jets=jets, 
-                                parent1=jetA.cluster_hist_index,
-                                parent2=jetB.cluster_hist_index,
+                                parent1=jetA.cluster_history_index,
+                                parent2=jetB.cluster_history_index,
                                 jetp_index=merged_jet.info.id, distance=distance)
             
             # Get the NNs for the merged pseudojet
@@ -201,7 +201,7 @@ def basicjetfinder(initial_particles: list[PseudoJet], Rparam: float=0.4, ptmin:
         else:
             # Beamjet
             jetA.info.active = False
-            add_step_to_history(history=history, jets=jets, parent1=jetA.cluster_hist_index, parent2=BeamJet, 
+            add_step_to_history(history=history, jets=jets, parent1=jetA.cluster_history_index, parent2=BeamJet, 
                                 jetp_index=Invalid, distance=distance)
 
         # Now need to update nearest distances

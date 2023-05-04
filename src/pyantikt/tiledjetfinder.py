@@ -281,7 +281,7 @@ def add_step_to_history(cs, parent1, parent2, jetp_index, dij):
 
     # get cross-referencing right from PseudoJets
     if jetp_index >= 0:
-        cs.jets[jetp_index].cluster_hist_index = local_step
+        cs.jets[jetp_index].cluster_history_index = local_step
 
 
 def map_indices_to_julia(tiling_setup, ieta, iphi):
@@ -375,11 +375,11 @@ def do_ij_recombination_step(cs, jet_i, jet_j, dij):
     newstep_k = len(cs.history)
 
     # and provide jet with the info
-    cs.jets[newjet_k].cluster_hist_index = newstep_k
+    cs.jets[newjet_k].cluster_history_index = newstep_k
 
     # finally sort out the history
-    hist_i = cs.jets[jet_i].cluster_hist_index
-    hist_j = cs.jets[jet_j].cluster_hist_index
+    hist_i = cs.jets[jet_i].cluster_history_index
+    hist_j = cs.jets[jet_j].cluster_history_index
 
     add_step_to_history(cs, min(hist_i, hist_j), max(hist_i, hist_j), newjet_k, dij)
 
@@ -390,7 +390,7 @@ def do_iB_recombination_step(cs, jet_i, diB):
     """Carries out the bookkeeping associated with the step of recombining
     jet_i with the beam"""
     # recombine the jet with the beam
-    add_step_to_history(cs, cs.jets[jet_i].cluster_hist_index, BeamJet, Invalid, diB)
+    add_step_to_history(cs, cs.jets[jet_i].cluster_history_index, BeamJet, Invalid, diB)
 
 
 def inclusive_jets(cs, ptmin=0.0):

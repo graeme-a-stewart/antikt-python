@@ -56,7 +56,7 @@ class HistoryElement:
 class ClusterSequence:
     # This contains the physical PseudoJets; for each PseudoJet one
     # can find the corresponding position in the _history by looking
-    # at _jets[i].cluster_hist_index()
+    # at _jets[i].cluster_history_index()
     jets: list[PseudoJet]
 
     # This vector will contain the branching history; for each stage,
@@ -85,7 +85,7 @@ def initial_history(particles):
         history.append(HistoryElement(jetp_index=i))
 
         # get cross-referencing right from PseudoJets
-        particles[i].cluster_hist_index = i
+        particles[i].cluster_history_index = i
 
         # determine the total energy in the event
         Qtot += particles[i].E
