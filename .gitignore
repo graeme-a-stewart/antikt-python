@@ -162,4 +162,5 @@ cython_debug/
 # Some project specific things
 *.out
 *.prof
-.vscode
+.vscode/
+notebooks/
