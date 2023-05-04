@@ -80,7 +80,7 @@ def main():
 
     # If we are bencmarking the numba code, do a warm up run
     # to jit compile the accelerated code
-    if args.benchmark and args.numba:
+    if args.trials > 1 and args.numba:
         print("Warm up run with first event to jit compile code")
         basicjetfinder(deepcopy(orignal_events[0]), Rparam=0.4, ptmin=0.5)
 
@@ -100,13 +100,14 @@ def main():
         benchmark.runtimes.append(end - start)
         print(f"Trial {itrial}. Processed {len(events)} events in {end-start:,.2f} us")
         print(f"Time per event: {(end-start)/len(events):,.2f} us")
+    if args.trials > 1:
+        mean, stddev = benchmark.get_stats()
+        print(f"Mean time per event {mean:,.2f} ± {stddev:,.2f} us")
 
     if args.benchmark:
         with open(args.benchmark, mode="w") as benchmark_file:
             print(benchmark.to_json(), file=benchmark_file)
         logger.info(benchmark)
-        mean, stddev = benchmark.get_stats()
-        print(f"Mean time per event {mean:,.2f} ± {stddev:,.2f} us")
 
 
 if __name__ == "__main__":
