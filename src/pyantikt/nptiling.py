@@ -37,7 +37,7 @@ class NPTiling:
         self.inv_pt2 = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=float)     # 1/pt^2
         self.dist = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=float)        # nearest neighbour geometric distance
         self.akt_dist = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=float)    # nearest neighbour antikt metric
-        self.nn = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=(np.int64,3))        # nearest neighbour coordinates
+        self.nn = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=int)            # nearest neighbour, ravelled index
         self.mask = np.ones((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=bool)          # if True this is not an active jet slot
         self.jets_index = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, max_jets_per_tile), dtype=int)    # index reference to the PseudoJet
 
@@ -97,8 +97,6 @@ class NPTiling:
                         neighbour[1] = setup.n_tiles_phi-1
                     elif neighbour[1] > setup.n_tiles_phi-1:
                         neighbour[1] = 0
-        #         print(f"{irap},{iphi} {self.neighbourtiles[irap,iphi]}")
-        # exit(0)
 
     def fill_with_jets(self, jets:list[PseudoJet], rap, phi):
         # First bulk calculate the bin indexes we need to use
@@ -122,7 +120,7 @@ class NPTiling:
             self.inv_pt2[_irap[ijet], _iphi[ijet], islot] = jet.inv_pt2
             self.dist[_irap[ijet], _iphi[ijet], islot] = 1e20
             self.akt_dist[_irap[ijet], _iphi[ijet], islot] = 1e20
-            self.nn[_irap[ijet], _iphi[ijet], islot] = (-1,-1,-1)
+            self.nn[_irap[ijet], _iphi[ijet], islot] = -1
             self.mask[_irap[ijet], _iphi[ijet], islot] = False
             self.jets_index[_irap[ijet], _iphi[ijet], islot] = ijet
             # print(f"Set jet {ijet} into ({_irap[ijet]}, {_iphi[ijet]}, {islot})")
@@ -130,7 +128,7 @@ class NPTiling:
     def mask_slot(self, ijet:tuple[int]):
         self.mask[ijet] = True
         self.dist[ijet] = self.akt_dist[ijet] = 1e20
-        self.nn[ijet] = [-1,-1,-1]
+        self.nn[ijet] = -1
         self.jets_index[ijet] = -1
 
     def insert_jet(self, newjet:PseudoJet, npjet_index:int):
@@ -151,14 +149,14 @@ class NPTiling:
         self.inv_pt2[_irap, _iphi, islot] = newjet.inv_pt2
         self.dist[_irap, _iphi, islot] = 1e20
         self.akt_dist[_irap, _iphi, islot] = 1e20
-        self.nn[_irap, _iphi, islot] = [-1,-1,-1]
+        self.nn[_irap, _iphi, islot] = -1
         self.mask[_irap, _iphi, islot] = False
         self.jets_index[_irap, _iphi, islot] = npjet_index
         # print(f"Added new jet {npjet_index} to ({_irap}, {_iphi}, {islot})")
         return _irap, _iphi, islot
     
     def dump_jet(self, ijet:tuple[int]):
-        print(f"NPTiledJet {ijet}: {self.rap[ijet]} {self.phi[ijet]} {self.inv_pt2[ijet]} {self.dist[ijet]} "
+        return(f"NPTiledJet {ijet}: {self.rap[ijet]} {self.phi[ijet]} {self.inv_pt2[ijet]} {self.dist[ijet]} "
               f"{self.akt_dist[ijet]} {self.nn[ijet]} {self.mask[ijet]} {self.jets_index[ijet]}")
 
 @njit

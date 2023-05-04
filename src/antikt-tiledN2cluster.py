@@ -99,7 +99,7 @@ def main():
             antikt_jets = faster_tiled_N2_cluster(event, Rparam=0.4, ptmin=5.0)
             logger.info(f"Event {ievt}, found {len(antikt_jets)} jets")
             for ijet, jet in enumerate(antikt_jets):
-                logger.debug(f"{ijet}, {jet.rap}, {jet.phi}, {jet.pt}")
+                logger.info(f"{ijet}, {jet.rap}, {jet.phi}, {jet.pt}")
         end = time.monotonic_ns() / 1000.0
         benchmark.runtimes.append(end - start)
         print(f"Trial {itrial}. Processed {len(events)} events in {end-start:,.2f} us")
