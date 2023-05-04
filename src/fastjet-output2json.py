@@ -12,7 +12,7 @@ def main():
     fastjet_events = []
     event_number = 0
     jets = []
-    with open("../data/fastjet.out") as fastjet_input:
+    with open("../data/fastjet-new.out") as fastjet_input:
         for line in fastjet_input:
             line = line.strip()
             if len(line) == 0:
