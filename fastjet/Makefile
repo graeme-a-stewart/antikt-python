@@ -7,8 +7,6 @@ FASTJET_DIR=/opt
 
 CXXFLAGS+=-MMD
 CXXFLAGS+=-O2 -ggdb
-CXXFLAGS+=-ggdb #For perf profiler
-#CXXFLAGS+=-ggdb -Og
 
 all: chep-polyglot-jets
 
@@ -22,7 +20,6 @@ DEPS:=$(addsuffix .d,$(basename $(SRC)))
 chep-polyglot-jets: chep-polyglot-jets.cc
 	$(LINK.cc) -o $@ -Wno-deprecated-declarations  -I $(FASTJET_DIR)/include -L $(FASTJET_DIR)/lib -Wl,--rpath $(FASTJET_DIR)/lib \
 -I $(HEPMC3_DIR)/include -L $(HEPMC3_DIR)/lib -Wl,--rpath $(HEPMC3_DIR) $< -l fastjet -lHepMC3 -lm
-
 
 -include $(DEPS)
 
