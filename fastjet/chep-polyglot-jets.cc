@@ -79,21 +79,26 @@ vector<fastjet::PseudoJet> run_fastjet_clustering(std::vector<fastjet::PseudoJet
 }
 
 int main(int argc, char* argv[]) {
-  // Usage: chep_polyglot_jets HEPMC3_EVENTS [MAX_EVENTS] [TRIALS] [STRATEGY] 
 
-  if (argc < 2 || argc > 5) {
-    std::cout << "Usage: " << argv[0] << " <HepMC3_input_file> [max_events] [n_trials] [strategy]" << std::endl;
-    std::cout << " Valid values for strategy are 'Best' (default), 'N2Plain', 'N2Tiled'" << std::endl;
+  if (argc < 2 || argc > 6) {
+    std::cout << "Usage: " << argv[0] << " <HepMC3_input_file> [max_events] [n_trials] [strategy] [dump]" << std::endl;
+    std::cout << " Max events default is -1, which is all the events in the file" << std::endl;
+    std::cout << " n_trials default is -1, which is the number of repeats to do" << std::endl;
+    std::cout << " Max events default is -1, which is all the events in the file" << std::endl;
+    std::cout << " strategy to use, valid values are 'Best' (default), 'N2Plain', 'N2Tiled'" << std::endl;
+    std::cout << " dump - if non-zero, output jets are printed" << std::endl;
     exit(-1);
   }
 
   long maxevents = -1;
   long trials = 1;
   string mystrategy = "Best";
+  bool dump = false;
   if (argc > 2) maxevents = strtoul(argv[2], 0, 0);
   if (argc > 3) trials = strtoul(argv[3], 0, 0);
   if (argc > 4) mystrategy = argv[4];
-  
+  if (argc > 5) dump = true;
+
   // read in input events
   //----------------------------------------------------------
   auto events = read_input_events(argv[1], maxevents);
@@ -117,15 +122,19 @@ int main(int argc, char* argv[]) {
     for (size_t ievt = 0; ievt < events.size(); ++ievt) {
       auto inclusive_jets = run_fastjet_clustering(events[ievt], strategy);
 
+      if (dump) {
+        std::cout << "Jets in processed event " << ievt+1 << ":" << endl;
+
       // // label the columns
       // printf("%5s %15s %15s %15s\n","jet #", "rapidity", "phi", "pt");
     
-      // // print out the details for each jet
-      // for (unsigned int i = 0; i < inclusive_jets.size(); i++) {
-      //   printf("%5u %15.8f %15.8f %15.8f\n",
-      //   i, inclusive_jets[i].rap(), inclusive_jets[i].phi(),
-      //   inclusive_jets[i].perp());
-      // }
+        // print out the details for each jet
+        for (unsigned int i = 0; i < inclusive_jets.size(); i++) {
+          printf("%5u %15.10f %15.10f %15.10f\n",
+          i, inclusive_jets[i].rap(), inclusive_jets[i].phi(),
+          inclusive_jets[i].perp());
+        }
+      }
     }
     auto stop_t = std::chrono::steady_clock::now();
     auto elapsed = stop_t - start_t;
