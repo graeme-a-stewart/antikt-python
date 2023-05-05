@@ -525,8 +525,13 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
             newjetindex = nptiling.insert_jet(merged_jet, npjet_index=imerged_jet)
 
             # Get the NNs for the merged pseudojet
-            # Note, this rescans the whole tile
-            scan_for_tile_nearest_neighbours(nptiling, newjetindex, R2)
+            single_jet_self_scan(irap=newjetindex[0], iphi=newjetindex[1], islot=newjetindex[2], 
+                                 rap=nptiling.rap, phi=nptiling.phi, inv_pt2=nptiling.inv_pt2,
+                                 nn=nptiling.nn, dist=nptiling.dist, akt_dist=nptiling.akt_dist,
+                                 mask=nptiling.mask,
+                                 neighbourtiles=nptiling.neighbourtiles, R2=R2,
+                                 phidim=nptiling.setup.n_tiles_phi,
+                                 slotdim=nptiling.max_jets_per_tile)
         else:
             jet_indexA = nptiling.jets_index[ijetA]
             logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA}={jet_indexA} and beam")
