@@ -275,6 +275,8 @@ def scan_for_all_nearest_neighbours(nptiling:NPTiling, R2:npt.DTypeLike):
     rightmost scanning strategy)"""
     for irap in range(nptiling.setup.n_tiles_rap):
         for iphi in range(nptiling.setup.n_tiles_phi):
+            if np.where(nptiling.mask[irap,iphi]==False)[0].size == 0:
+                continue
             tile_self_scan(irap=irap, iphi=iphi, rap=nptiling.rap, phi=nptiling.phi, 
                             inv_pt2=nptiling.inv_pt2, nn=nptiling.nn, 
                             dist=nptiling.dist, akt_dist=nptiling.akt_dist,
@@ -285,6 +287,8 @@ def scan_for_all_nearest_neighbours(nptiling:NPTiling, R2:npt.DTypeLike):
             # Now we scan all of the neighbour tiles
             for jrap, jphi in nptiling.neighbourtiles[irap,iphi]:
                 if jrap == -1:
+                    continue
+                if np.where(nptiling.mask[jrap,jphi]==False)[0].size == 0:
                     continue
                 tile_comparison_scan(irap=irap, iphi=iphi, jrap=jrap, jphi=jphi,
                                      rap=nptiling.rap, phi=nptiling.phi, 
@@ -305,6 +309,8 @@ def scan_for_tile_nearest_neighbours(nptiling:NPTiling, newjetindex:tuple[int], 
     # First, scan my own tile
     irap = newjetindex[0]
     iphi = newjetindex[1]
+    if np.where(nptiling.mask[irap,iphi]==False)[0].size == 0:
+        return
     tile_self_scan(irap=irap, iphi=iphi,
                    rap=nptiling.rap, phi=nptiling.phi,
                    inv_pt2=nptiling.inv_pt2, nn=nptiling.nn,
@@ -317,6 +323,8 @@ def scan_for_tile_nearest_neighbours(nptiling:NPTiling, newjetindex:tuple[int], 
     # Now scan from my tile to surrounding tiles
     for jrap, jphi in nptiling.neighbourtiles[irap,iphi]:
         if jrap == -1:
+            continue
+        if np.where(nptiling.mask[jrap,jphi]==False)[0].size == 0:
             continue
         tile_comparison_scan(irap=irap, iphi=iphi, jrap=jrap, jphi=jphi,
                                 rap=nptiling.rap, phi=nptiling.phi, 
