@@ -44,9 +44,8 @@ class NPTiling:
         # Setup safety values for distances
         self.dist.fill(1e20)
         self.akt_dist.fill(1e20)
-        self.nn[0].fill(-1)
-        self.nn[1].fill(-1)
-        self.nn[2].fill(-1)
+        self.nn.fill(-1)
+
 
         # This tuple holds the rightmost neighbour tiles of any tile
         # N.B. phi wraps, but rap does not
