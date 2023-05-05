@@ -334,6 +334,21 @@ def scan_for_all_nearest_neighbours(nptiling:NPTiling, R2:npt.DTypeLike):
                         phidim=nptiling.setup.n_tiles_phi,
                         slotdim=nptiling.max_jets_per_tile)
 
+@njit
+def all_jets_scan(rap:npt.ArrayLike, phi:npt.ArrayLike, inv_pt2:npt.ArrayLike,
+                        nn:npt.ArrayLike, dist:npt.ArrayLike, akt_dist:npt.ArrayLike,
+                        mask:npt.ArrayLike,
+                        neighbourtiles:npt.ArrayLike, R2:float, phidim:int,
+                        slotdim:int):
+    active_jets = np.where(mask==False)
+    for irap, iphi, islot in zip(active_jets[0], active_jets[1], active_jets[2]):
+        single_jet_self_scan(irap=irap, iphi=iphi, islot=islot,
+                        rap=rap, phi=phi, inv_pt2=inv_pt2,
+                        nn=nn, dist=dist, akt_dist=akt_dist,
+                        mask=mask,
+                        neighbourtiles=neighbourtiles, R2=R2,
+                        phidim=phidim,
+                        slotdim=slotdim)
 
 def find_closest_jets(akt_distance:npt.ArrayLike):
     minimum_distance_ravelled = np.argmin(akt_distance)
@@ -467,7 +482,13 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
     nptiling = initial_tiling(jets, Rparam)
 
     # Setup the initial nearest neighbours
-    scan_for_all_nearest_neighbours(nptiling, R2)
+    # scan_for_all_nearest_neighbours(nptiling, R2)
+    all_jets_scan(rap=nptiling.rap, phi=nptiling.phi, inv_pt2=nptiling.inv_pt2,
+                        nn=nptiling.nn, dist=nptiling.dist, akt_dist=nptiling.akt_dist,
+                        mask=nptiling.mask,
+                        neighbourtiles=nptiling.neighbourtiles, R2=R2,
+                        phidim=nptiling.setup.n_tiles_phi,
+                        slotdim=nptiling.max_jets_per_tile)
 
     # Each iteration we either merge two jets to one, or we
     # finalise a jet. Thus it takes a number of iterations
