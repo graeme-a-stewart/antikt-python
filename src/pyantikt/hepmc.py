@@ -1,5 +1,4 @@
 import pyhepmc
-import vector
 from pyantikt.pseudojet import PseudoJet
 
 import numpy as np
