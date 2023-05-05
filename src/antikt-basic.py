@@ -36,6 +36,7 @@ def main():
         "--trials", type=int, default=1, help="Number of trials to repeat"
     )
     parser.add_argument("--output", metavar="FILE", help="Write logging output to FILE")
+    parser.add_argument("--jetout", metavar="FILE", help="Write final jet numbers to FILE")
     parser.add_argument(
         "--debug", action="store_true", help="Activate logging debugging mode"
     )
@@ -84,6 +85,10 @@ def main():
         print("Warm up run with first event to jit compile code")
         basicjetfinder(deepcopy(orignal_events[0]), Rparam=0.4, ptmin=0.5)
 
+    if args.jetout:
+        fjet = open(args.jetout, "w")
+        print("NFinaljets", file=fjet)
+
     for itrial in range(1, args.trials + 1):
         if args.trials > 1:
             events = deepcopy(orignal_events)
@@ -96,6 +101,8 @@ def main():
             logger.info(f"Event {ievt}, found {len(antikt_jets)} jets")
             for ijet, jet in enumerate(antikt_jets):
                 logger.info(f"{ijet}, {jet.rap}, {jet.phi}, {jet.pt}")
+            if args.jetout:
+                print(len(antikt_jets), file=fjet)
         end = time.monotonic_ns() / 1000.0
         benchmark.runtimes.append(end - start)
         print(f"Trial {itrial}. Processed {len(events)} events in {end-start:,.2f} us")

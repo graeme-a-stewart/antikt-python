@@ -20,6 +20,8 @@ def main():
         help="Maximum number of events to process",
     )
     parser.add_argument("--stats", help="Dump stats of number of particles per event to file")
+    parser.add_argument("--eventnumber", action="store_true", default=False,
+                        help="Also write the event number to the output file")
     parser.add_argument("eventfile", help="File with HepMC3 events to process")
     parser.add_argument("output", metavar="FILE", help="Write event output to FILE")
 
@@ -29,16 +31,16 @@ def main():
         file=args.eventfile, skip=args.skip, nevents=args.maxevents
     )
 
+    if len(events) > 1 and not args.eventnumber:
+        print("Warning, multiple events will be written to the same file without eventnumbers")
+
     if args.stats:
         statsf = open(args.stats, "w")
-    for ievent, event in enumerate(events):
-        if args.maxevents > 1:
-            filename = f"{args.output}-{ievent:02}.txt"
-        else:
-            filename = args.output
-        
-        with open(filename, "w") as outf:
-            for particle in event:
+    with open(args.output, "w") as outf:
+        for ievent, event in enumerate(events):
+          for particle in event:
+                if args.eventnumber:
+                    print(f"{ievent} ", file=outf, end="")
                 print(f"{particle.px} {particle.py} {particle.pz} {particle.E}", file=outf)
         if (args.stats):
             print(len(event), file=statsf)
