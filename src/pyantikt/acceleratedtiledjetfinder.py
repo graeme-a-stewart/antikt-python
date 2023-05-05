@@ -322,33 +322,18 @@ def tile_comparison_scan(irap:np.int64, iphi:np.int64,
 
 
 def scan_for_all_nearest_neighbours(nptiling:NPTiling, R2:npt.DTypeLike):
-    """Scan over all tiles, where we need to self-scan, then compare against
-    neighbours (as scanning is currently uni-directional, we cannot use the
-    rightmost scanning strategy)"""
-    for irap in range(nptiling.setup.n_tiles_rap):
-        for iphi in range(nptiling.setup.n_tiles_phi):
-            if np.where(nptiling.mask[irap,iphi]==False)[0].size == 0:
-                continue
-            tile_self_scan(irap=irap, iphi=iphi, rap=nptiling.rap, phi=nptiling.phi, 
-                            inv_pt2=nptiling.inv_pt2, nn=nptiling.nn, 
-                            dist=nptiling.dist, akt_dist=nptiling.akt_dist,
-                            mask=nptiling.mask, R2=R2,
-                            phidim=nptiling.setup.n_tiles_phi,
-                            slotdim=nptiling.max_jets_per_tile)
+    """New scan strategy, use the mask to identify all active jets, then scan them
+    one by one"""
+    active_jets = np.where(nptiling.mask==False)
+    for irap, iphi, islot in zip(active_jets[0], active_jets[1], active_jets[2]):
+        single_jet_self_scan(irap=irap, iphi=iphi, islot=islot, 
+                        rap=nptiling.rap, phi=nptiling.phi, inv_pt2=nptiling.inv_pt2,
+                        nn=nptiling.nn, dist=nptiling.dist, akt_dist=nptiling.akt_dist,
+                        mask=nptiling.mask,
+                        neighbourtiles=nptiling.neighbourtiles, R2=R2,
+                        phidim=nptiling.setup.n_tiles_phi,
+                        slotdim=nptiling.max_jets_per_tile)
 
-            # Now we scan all of the neighbour tiles
-            for jrap, jphi in nptiling.neighbourtiles[irap,iphi]:
-                if jrap == -1:
-                    continue
-                if np.where(nptiling.mask[jrap,jphi]==False)[0].size == 0:
-                    continue
-                tile_comparison_scan(irap=irap, iphi=iphi, jrap=jrap, jphi=jphi,
-                                     rap=nptiling.rap, phi=nptiling.phi, 
-                            inv_pt2=nptiling.inv_pt2, nn=nptiling.nn, 
-                            dist=nptiling.dist, akt_dist=nptiling.akt_dist,
-                            mask=nptiling.mask, R2=R2,
-                            phidim=nptiling.setup.n_tiles_phi,
-                            slotdim=nptiling.max_jets_per_tile)
 
 def find_closest_jets(akt_distance:npt.ArrayLike):
     minimum_distance_ravelled = np.argmin(akt_distance)
