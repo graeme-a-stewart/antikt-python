@@ -36,14 +36,15 @@ def main():
 
     if args.stats:
         statsf = open(args.stats, "w")
+        print("Input_Particles", file=statsf)
     with open(args.output, "w") as outf:
         for ievent, event in enumerate(events):
-          for particle in event:
+            for particle in event:
                 if args.eventnumber:
                     print(f"{ievent} ", file=outf, end="")
                 print(f"{particle.px} {particle.py} {particle.pz} {particle.E}", file=outf)
-        if (args.stats):
-            print(len(event), file=statsf)
+            if (args.stats):
+                print(len(event), file=statsf)
 
 if __name__ == "__main__":
     main()
