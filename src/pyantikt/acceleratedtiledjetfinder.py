@@ -211,6 +211,58 @@ def initial_tiling(jets, Rparam=0.4):
     return tiling
 
 @njit
+def single_jet_self_scan(irap:np.int64, iphi:np.int64, islot:np.int64,
+                   rap:npt.ArrayLike, phi:npt.ArrayLike,
+                   inv_pt2:npt.ArrayLike,
+                   nn:npt.ArrayLike, dist:npt.ArrayLike,
+                   akt_dist:npt.ArrayLike, 
+                   mask:npt.ArrayLike, 
+                   neighbourtiles:npt.ArrayLike,
+                   R2:npt.DTypeLike,
+                   phidim:np.int64,
+                   slotdim:np.int64):
+    """Scan a single jet for its nearest neighbours, including neighbouring tiles"""
+    # Saftey first...
+    dist[irap,iphi,islot] = R2
+    nn[irap,iphi,islot] = -1
+
+    # print(islot, type(islot))
+    # _myphi = phi[irap,iphi,islot]
+    # print(_myphi, type(_myphi))
+
+    _dphi = np.pi - np.abs(np.pi - np.abs(phi[irap,iphi] - phi[irap,iphi,islot]))
+    _drap = rap[irap,iphi] - np.float64(rap[irap,iphi,islot])
+    _dist = _dphi*_dphi + _drap*_drap
+    _dist[islot] = R2 # Avoid measuring the distance 0 to myself!
+    _dist[mask[irap,iphi]] = 1e20 # Don't consider any masked jets
+    iclosejet = _dist.argmin()
+    dist[irap,iphi,islot] = _dist[iclosejet]
+    if iclosejet == islot:
+        nn[irap,iphi,islot] = -1
+        akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
+    else:
+        # This is a manual ravelling, as "ravel_multi_index" isn't supported in numba
+        nn[irap,iphi,islot] = irap*(phidim*slotdim) + iphi*slotdim + iclosejet
+        # nn[irap,iphi,islot] = np.ravel_multi_index((irap, iphi, iclosejet), nn.shape)
+        akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[irap, iphi, iclosejet])
+
+    # Now scan neighbour tiles
+    for jrap, jphi in neighbourtiles[irap, iphi]:
+        if jrap == -1:
+            continue
+        if np.where(mask[jrap,jphi]==False)[0].size == 0:
+            continue
+        _dphi = np.pi - np.abs(np.pi - np.abs(phi[jrap,jphi] - phi[irap,iphi,islot]))
+        _drap = rap[jrap,jphi] - np.float64(rap[irap,iphi,islot])
+        _dist = _dphi*_dphi + _drap*_drap
+        _dist[mask[jrap,jphi]] = 1e20 # Don't consider any masked jets
+        jclosejet = _dist.argmin()
+        if _dist[jclosejet] < dist[irap, iphi, islot]:
+            dist[irap,iphi,islot] = _dist[jclosejet]
+            nn[irap,iphi,islot] = jrap*(phidim*slotdim) + jphi*slotdim + jclosejet
+            akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[jrap, jphi, jclosejet])
+
+@njit
 def tile_self_scan(irap:np.int64, iphi:np.int64,
                    rap:npt.ArrayLike, phi:npt.ArrayLike,
                    inv_pt2:npt.ArrayLike,
@@ -445,9 +497,6 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
         # Add normalisation for real distance
         distance *= invR2
 
-        # For each iteration, keep track of any recanned tiles, to avoid repetition
-        tiles_rescanned = []
-
         if (iflatjetB >= 0):
             # This is the index in the PseudoJet array
             jet_indexA = nptiling.jets_index[ijetA]
@@ -476,9 +525,8 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
             newjetindex = nptiling.insert_jet(merged_jet, npjet_index=imerged_jet)
 
             # Get the NNs for the merged pseudojet
-            # Note, this rescans the whole tile and all neighbours
+            # Note, this rescans the whole tile
             scan_for_tile_nearest_neighbours(nptiling, newjetindex, R2)
-            tiles_rescanned.append((newjetindex[0], newjetindex[1]))
         else:
             jet_indexA = nptiling.jets_index[ijetA]
             logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA}={jet_indexA} and beam")
@@ -498,15 +546,27 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
         jets_to_update = np.where(nptiling.nn==iflatjetA)
         logger.debug(f"To update for jetA: {jets_to_update}")
         for irap, iphi, islot in zip(jets_to_update[0], jets_to_update[1], jets_to_update[2]):
-            if (irap, iphi) not in tiles_rescanned:
-                scan_for_tile_nearest_neighbours(nptiling, (irap, iphi, islot), R2)
-                tiles_rescanned.append((irap, iphi))
+            if nptiling.mask[irap,iphi,islot]:
+                raise RuntimeError(f"Jet A NN {irap},{iphi},{islot} is masked {nptiling.dump_jet((irap,iphi,islot))}")
+            single_jet_self_scan(irap=irap, iphi=iphi, islot=islot, 
+                                 rap=nptiling.rap, phi=nptiling.phi, inv_pt2=nptiling.inv_pt2,
+                                 nn=nptiling.nn, dist=nptiling.dist, akt_dist=nptiling.akt_dist,
+                                 mask=nptiling.mask,
+                                 neighbourtiles=nptiling.neighbourtiles, R2=R2,
+                                 phidim=nptiling.setup.n_tiles_phi,
+                                 slotdim=nptiling.max_jets_per_tile)
         if (iflatjetB >= 0):
             jets_to_update = np.where(nptiling.nn==iflatjetB)
             logger.debug(f"To update for jetB: {jets_to_update}")
             for irap, iphi, islot in zip(jets_to_update[0], jets_to_update[1], jets_to_update[2]):
-                if (irap, iphi) not in tiles_rescanned:
-                    scan_for_tile_nearest_neighbours(nptiling, (irap, iphi, islot), R2)
-                    tiles_rescanned.append((irap, iphi))
+                if nptiling.mask[irap,iphi,islot]:
+                    raise RuntimeError("Jet B NN {irap},{iphi},{islot} is masked")
+                single_jet_self_scan(irap=irap, iphi=iphi, islot=islot,
+                                 rap=nptiling.rap, phi=nptiling.phi, inv_pt2=nptiling.inv_pt2,
+                                 nn=nptiling.nn, dist=nptiling.dist, akt_dist=nptiling.akt_dist,
+                                 neighbourtiles=nptiling.neighbourtiles, R2=R2,
+                                 mask=nptiling.mask,
+                                 phidim=nptiling.setup.n_tiles_phi,
+                                 slotdim=nptiling.max_jets_per_tile)
 
     return inclusive_jets(jets, history, ptmin=ptmin)
