@@ -171,16 +171,6 @@ def initial_tiling(jets, Rparam=0.4):
     tiles_rap_max = tiles_irap_max * tile_size_rap
     n_tiles_rap = np.int64(tiles_irap_max - tiles_irap_min + 1)
 
-    # print(tiles_rap_min,
-    #     tiles_rap_max,
-    #     tile_size_rap,
-    #     tile_size_phi,
-    #     n_tiles_rap,
-    #     n_tiles_phi,
-    #     tiles_irap_min,
-    #     tiles_irap_max,
-    # )
-
     # We need to do a quick scan, using the tiled definition to find out
     # how many jets we need to have space for in the tile, i.e., what's the
     # maximum value in any tile - we basically 2D historgam all the jets
@@ -188,7 +178,6 @@ def initial_tiling(jets, Rparam=0.4):
     myhist = np.histogram2d(rap, phi, bins=[n_tiles_rap, n_tiles_phi],
                             range=[[tiles_rap_min, tile_size_rap * n_tiles_rap + tiles_rap_min], [0.0, 2*np.pi]])
     # Can cross check with original here
-    # print(myhist)
 
     max_jets_per_tile = np.int64(np.max(myhist[0]))
     # print(f"Max jets per tile: {max_jets_per_tile}")
@@ -262,77 +251,6 @@ def single_jet_self_scan(irap:np.int64, iphi:np.int64, islot:np.int64,
             nn[irap,iphi,islot] = jrap*(phidim*slotdim) + jphi*slotdim + jclosejet
             akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[jrap, jphi, jclosejet])
 
-@njit
-def tile_self_scan(irap:np.int64, iphi:np.int64,
-                   rap:npt.ArrayLike, phi:npt.ArrayLike,
-                   inv_pt2:npt.ArrayLike,
-                   nn:npt.ArrayLike, dist:npt.ArrayLike,
-                   akt_dist:npt.ArrayLike, 
-                   mask:npt.ArrayLike, R2:npt.DTypeLike,
-                   phidim:np.int64,
-                   slotdim:np.int64):
-    """Scan a tile for it's own nearest neighbours"""
-    for islot in np.where(mask[irap,iphi]==False)[0]:
-        # Saftey first...
-        dist[irap,iphi,islot] = R2
-        nn[irap,iphi,islot] = -1
-        # print(islot, type(islot))
-        # _myphi = phi[irap,iphi,islot]
-        # print(_myphi, type(_myphi))
-        _dphi = np.pi - np.abs(np.pi - np.abs(phi[irap,iphi] - phi[irap,iphi,islot]))
-        _drap = rap[irap,iphi] - np.float64(rap[irap,iphi,islot])
-        _dist = _dphi*_dphi + _drap*_drap
-        _dist[islot] = R2 # Avoid measuring the distance 0 to myself!
-        _dist[mask[irap,iphi]] = 1e20 # Don't consider any masked jets
-        iclosejet = _dist.argmin()
-        dist[irap,iphi,islot] = _dist[iclosejet]
-        if iclosejet == islot:
-            nn[irap,iphi,islot] = -1
-            akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
-        else:
-            # This is a manual ravelling, as "ravel_multi_index" isn't supported in numba
-            nn[irap,iphi,islot] = irap*(phidim*slotdim) + iphi*slotdim + iclosejet
-            # nn[irap,iphi,islot] = np.ravel_multi_index((irap, iphi, iclosejet), nn.shape)
-            akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[irap, iphi, iclosejet])
-
-
-@njit
-def tile_comparison_scan(irap:np.int64, iphi:np.int64,
-                         jrap:np.int64, jphi:np.int64,
-                         rap:npt.ArrayLike, phi:npt.ArrayLike,
-                         nn:npt.ArrayLike, dist:npt.ArrayLike,
-                         akt_dist:npt.ArrayLike, inv_pt2:npt.ArrayLike,
-                         mask:npt.ArrayLike, R2:npt.DTypeLike,
-                         phidim:np.int64,
-                         slotdim:np.int64):
-    """Scan a tile (irap, iphi) against jets in tile (jrap, jphi)"""
-    for islot in np.where(mask[irap,iphi]==False)[0]:
-        _dphi = np.pi - np.abs(np.pi - np.abs(phi[jrap,jphi] - phi[irap,iphi,islot]))
-        _drap = rap[jrap,jphi] - rap[irap,iphi,islot]
-        _dist = _dphi*_dphi + _drap*_drap
-        _dist[mask[jrap,jphi]] = 1e20 # Don't consider any masked jets
-        jclosejet = _dist.argmin()
-        close_dist = _dist[jclosejet]
-        if dist[irap,iphi,islot] > close_dist:
-            dist[irap,iphi,islot] = close_dist
-            # This is a manual ravelling, as "ravel_multi_index" isn't supported in numba
-            nn[irap,iphi,islot] = jrap*(phidim*slotdim) + jphi*slotdim + jclosejet
-            #nn[irap,iphi,islot] = np.ravel_multi_index((jrap,jphi,iclosejet), nn.shape)
-            akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[jrap, jphi, jclosejet])
-
-
-def scan_for_all_nearest_neighbours(nptiling:NPTiling, R2:npt.DTypeLike):
-    """New scan strategy, use the mask to identify all active jets, then scan them
-    one by one"""
-    active_jets = np.where(nptiling.mask==False)
-    for irap, iphi, islot in zip(active_jets[0], active_jets[1], active_jets[2]):
-        single_jet_self_scan(irap=irap, iphi=iphi, islot=islot, 
-                        rap=nptiling.rap, phi=nptiling.phi, inv_pt2=nptiling.inv_pt2,
-                        nn=nptiling.nn, dist=nptiling.dist, akt_dist=nptiling.akt_dist,
-                        mask=nptiling.mask,
-                        neighbourtiles=nptiling.neighbourtiles, R2=R2,
-                        phidim=nptiling.setup.n_tiles_phi,
-                        slotdim=nptiling.max_jets_per_tile)
 
 @njit
 def all_jets_scan(rap:npt.ArrayLike, phi:npt.ArrayLike, inv_pt2:npt.ArrayLike,
@@ -350,41 +268,11 @@ def all_jets_scan(rap:npt.ArrayLike, phi:npt.ArrayLike, inv_pt2:npt.ArrayLike,
                         phidim=phidim,
                         slotdim=slotdim)
 
+
 def find_closest_jets(akt_distance:npt.ArrayLike):
     minimum_distance_ravelled = np.argmin(akt_distance)
     minimum_distance_index = np.unravel_index(minimum_distance_ravelled, akt_distance.shape)
     return akt_distance[minimum_distance_index], tuple(minimum_distance_index), minimum_distance_ravelled
-
-
-def scan_for_tile_nearest_neighbours(nptiling:NPTiling, newjetindex:tuple[int], R2:float):
-    """Scan for nearest neighbours of a tile"""
-    # First, scan my own tile
-    irap = newjetindex[0]
-    iphi = newjetindex[1]
-    if np.where(nptiling.mask[irap,iphi]==False)[0].size == 0:
-        return
-    tile_self_scan(irap=irap, iphi=iphi,
-                   rap=nptiling.rap, phi=nptiling.phi,
-                   inv_pt2=nptiling.inv_pt2, nn=nptiling.nn,
-                   dist=nptiling.dist,
-                   akt_dist=nptiling.akt_dist, mask=nptiling.mask,
-                   R2=R2,
-                   phidim=nptiling.setup.n_tiles_phi,
-                   slotdim=nptiling.max_jets_per_tile)
-
-    # Now scan from my tile to surrounding tiles
-    for jrap, jphi in nptiling.neighbourtiles[irap,iphi]:
-        if jrap == -1:
-            continue
-        if np.where(nptiling.mask[jrap,jphi]==False)[0].size == 0:
-            continue
-        tile_comparison_scan(irap=irap, iphi=iphi, jrap=jrap, jphi=jphi,
-                                rap=nptiling.rap, phi=nptiling.phi, 
-                    inv_pt2=nptiling.inv_pt2, nn=nptiling.nn, 
-                    dist=nptiling.dist, akt_dist=nptiling.akt_dist,
-                    mask=nptiling.mask, R2=R2,
-                    phidim=nptiling.setup.n_tiles_phi,
-                    slotdim=nptiling.max_jets_per_tile)
 
 
 def do_debug_scan(nptiling:NPTiling, ijet):
