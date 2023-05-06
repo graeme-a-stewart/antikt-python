@@ -215,25 +215,22 @@ def single_jet_self_scan(irap:np.int64, iphi:np.int64, islot:np.int64,
     dist[irap,iphi,islot] = R2
     nn[irap,iphi,islot] = -1
 
-    # print(islot, type(islot))
-    # _myphi = phi[irap,iphi,islot]
-    # print(_myphi, type(_myphi))
-
-    _dphi = np.pi - np.abs(np.pi - np.abs(phi[irap,iphi] - phi[irap,iphi,islot]))
-    _drap = rap[irap,iphi] - np.float64(rap[irap,iphi,islot])
-    _dist = _dphi*_dphi + _drap*_drap
-    _dist[islot] = R2 # Avoid measuring the distance 0 to myself!
-    _dist[mask[irap,iphi]] = 1e20 # Don't consider any masked jets
-    iclosejet = _dist.argmin()
-    dist[irap,iphi,islot] = _dist[iclosejet]
-    if iclosejet == islot:
-        nn[irap,iphi,islot] = -1
-        akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
+    if np.where(mask[irap,iphi]==False)[0].size == 1:
+        # I am the only jet in this tile, no need to scan, I am my NN in this tile
+        pass
     else:
-        # This is a manual ravelling, as "ravel_multi_index" isn't supported in numba
-        nn[irap,iphi,islot] = irap*(phidim*slotdim) + iphi*slotdim + iclosejet
-        # nn[irap,iphi,islot] = np.ravel_multi_index((irap, iphi, iclosejet), nn.shape)
-        akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[irap, iphi, iclosejet])
+        _dphi = np.pi - np.abs(np.pi - np.abs(phi[irap,iphi] - phi[irap,iphi,islot]))
+        _drap = rap[irap,iphi] - np.float64(rap[irap,iphi,islot])
+        _dist = _dphi*_dphi + _drap*_drap
+        _dist[islot] = R2 # Avoid measuring the distance 0 to myself!
+        _dist[mask[irap,iphi]] = 1e20 # Don't consider any masked jets
+        iclosejet = _dist.argmin()
+        dist[irap,iphi,islot] = _dist[iclosejet]
+        if iclosejet == islot:
+            nn[irap,iphi,islot] = -1
+        else:
+            # This is a manual ravelling, as "ravel_multi_index" isn't supported in numba
+            nn[irap,iphi,islot] = irap*(phidim*slotdim) + iphi*slotdim + iclosejet
 
     # Now scan neighbour tiles
     for jrap, jphi in neighbourtiles[irap, iphi]:
@@ -249,8 +246,18 @@ def single_jet_self_scan(irap:np.int64, iphi:np.int64, islot:np.int64,
         if _dist[jclosejet] < dist[irap, iphi, islot]:
             dist[irap,iphi,islot] = _dist[jclosejet]
             nn[irap,iphi,islot] = jrap*(phidim*slotdim) + jphi*slotdim + jclosejet
-            akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[jrap, jphi, jclosejet])
 
+    # Update akt_dist
+    if nn[irap,iphi,islot] > -1:
+        # Unravel the nn index
+        j = nn[irap,iphi,islot]
+        jrap = j // (phidim*slotdim)
+        j -= jrap*(phidim*slotdim)
+        jphi = j // slotdim
+        jslot = j - jphi*slotdim
+        akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[jrap, jphi, jslot])
+    else:
+        akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
 
 @njit
 def all_jets_scan(rap:npt.ArrayLike, phi:npt.ArrayLike, inv_pt2:npt.ArrayLike,
