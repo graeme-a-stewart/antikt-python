@@ -199,6 +199,13 @@ def initial_tiling(jets, Rparam=0.4):
 
     return tiling
 
+@njit 
+def two_jet_dist(rapA:np.float64, rapB:np.float64,
+                 phiA:np.float64, phiB:np.float64):
+    _dphi = np.pi - np.abs(np.pi - np.abs(phiA - phiB))
+    _drap = rapA - rapB
+    return _dphi*_dphi + _drap*_drap
+
 @njit
 def single_jet_self_scan(irap:np.int64, iphi:np.int64, islot:np.int64,
                    rap:npt.ArrayLike, phi:npt.ArrayLike,
@@ -214,12 +221,15 @@ def single_jet_self_scan(irap:np.int64, iphi:np.int64, islot:np.int64,
     # Saftey first...
     dist[irap,iphi,islot] = R2
     nn[irap,iphi,islot] = -1
+    # akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
 
-    if np.where(mask[irap,iphi]==False)[0].size == 1:
-        # I am the only jet in this tile, no need to scan
-        akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
+    ijets = np.where(mask[irap,iphi]==False)[0].size
+    if ijets == 1:
+        # I am the only jet in this tile, no need to scan, I am my NN in this tile
+        # akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
         pass
-    else:
+    elif ijets > 5:
+        # Array strategy - for high numbers of target jets
         _dphi = np.pi - np.abs(np.pi - np.abs(phi[irap,iphi] - phi[irap,iphi,islot]))
         _drap = rap[irap,iphi] - np.float64(rap[irap,iphi,islot])
         _dist = _dphi*_dphi + _drap*_drap
@@ -229,28 +239,70 @@ def single_jet_self_scan(irap:np.int64, iphi:np.int64, islot:np.int64,
         dist[irap,iphi,islot] = _dist[iclosejet]
         if iclosejet == islot:
             nn[irap,iphi,islot] = -1
-            akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
+            # akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
         else:
             # This is a manual ravelling, as "ravel_multi_index" isn't supported in numba
             nn[irap,iphi,islot] = irap*(phidim*slotdim) + iphi*slotdim + iclosejet
             # nn[irap,iphi,islot] = np.ravel_multi_index((irap, iphi, iclosejet), nn.shape)
-            akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[irap, iphi, iclosejet])
+            # akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[irap, iphi, iclosejet])
+    else:
+        # Loop strategy - for low numbers of target jets
+        for _slot in np.where(mask[irap,iphi]==False)[0]:
+            if _slot == islot:
+                # nn[irap,iphi,islot] = -1
+                continue
+            else:
+                _dphi = np.pi - np.abs(np.pi - np.abs(phi[irap,iphi,islot] - phi[irap,iphi,_slot]))
+                _drap = rap[irap,iphi,islot] - rap[irap,iphi,_slot]
+                _dist = _dphi*_dphi + _drap*_drap
+            # _dist = two_jet_dist(rapA=rap[irap,iphi,islot], rapB=rap[jrap,jphi,jslot],
+            #                     phiA=phi[irap,iphi,islot], phiB=phi[jrap,jphi,jslot])
+            if _dist < dist[irap, iphi, islot]:
+                dist[irap,iphi,islot] = _dist
+                nn[irap,iphi,islot] = irap*(phidim*slotdim) + iphi*slotdim + _slot
+                # akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[irap, iphi, _slot])
+
 
     # Now scan neighbour tiles
     for jrap, jphi in neighbourtiles[irap, iphi]:
         if jrap == -1:
             continue
-        if np.where(mask[jrap,jphi]==False)[0].size == 0:
+        jjets = np.where(mask[jrap,jphi]==False)[0].size
+        if jjets == 0:
             continue
-        _dphi = np.pi - np.abs(np.pi - np.abs(phi[jrap,jphi] - phi[irap,iphi,islot]))
-        _drap = rap[jrap,jphi] - np.float64(rap[irap,iphi,islot])
-        _dist = _dphi*_dphi + _drap*_drap
-        _dist[mask[jrap,jphi]] = 1e20 # Don't consider any masked jets
-        jclosejet = _dist.argmin()
-        if _dist[jclosejet] < dist[irap, iphi, islot]:
-            dist[irap,iphi,islot] = _dist[jclosejet]
-            nn[irap,iphi,islot] = jrap*(phidim*slotdim) + jphi*slotdim + jclosejet
-            akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[jrap, jphi, jclosejet])
+        if jjets > 5:
+        # Array strategy - for high numbers of target jets
+            _dphi = np.pi - np.abs(np.pi - np.abs(phi[jrap,jphi] - phi[irap,iphi,islot]))
+            _drap = rap[jrap,jphi] - np.float64(rap[irap,iphi,islot])
+            _dist = _dphi*_dphi + _drap*_drap
+            _dist[mask[jrap,jphi]] = 1e20 # Don't consider any masked jets
+            jclosejet = _dist.argmin()
+            if _dist[jclosejet] < dist[irap, iphi, islot]:
+                dist[irap,iphi,islot] = _dist[jclosejet]
+                nn[irap,iphi,islot] = jrap*(phidim*slotdim) + jphi*slotdim + jclosejet
+                # akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[jrap, jphi, jclosejet])
+        else:
+        # Loop strategy - for low numbers of target jets
+            for jslot in np.where(mask[jrap,jphi]==False)[0]:
+                _dphi = np.pi - np.abs(np.pi - np.abs(phi[irap,iphi,islot] - phi[jrap,jphi,jslot]))
+                _drap = rap[irap,iphi,islot] - rap[jrap,jphi,jslot]
+                _dist = _dphi*_dphi + _drap*_drap
+                # _dist = two_jet_dist(rapA=rap[irap,iphi,islot], rapB=rap[jrap,jphi,jslot],
+                #                     phiA=phi[irap,iphi,islot], phiB=phi[jrap,jphi,jslot])
+                if _dist < dist[irap, iphi, islot]:
+                    dist[irap,iphi,islot] = _dist
+                    nn[irap,iphi,islot] = jrap*(phidim*slotdim) + jphi*slotdim + jslot
+                    # akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[jrap, jphi, jslot])
+    
+    if nn[irap,iphi,islot] > -1:
+        j = nn[irap,iphi,islot]
+        jrap = j // (phidim*slotdim)
+        j -= jrap*(phidim*slotdim)
+        jphi = j // slotdim
+        jslot = j - jphi*slotdim
+        akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[jrap, jphi, jslot])
+    else:
+        akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
 
 
 @njit
