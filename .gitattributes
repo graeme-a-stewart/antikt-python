@@ -8,4 +8,4 @@
 # First version https://zhauniarovich.com/post/2020/2020-10-clearing-jupyter-output-p3/
 # was actually broken!
 #
-*.ipynb filter=jupyternotebook
+#*.ipynb filter=jupyternotebook
