@@ -97,6 +97,17 @@ class NPTiling:
                     elif neighbour[1] > setup.n_tiles_phi-1:
                         neighbour[1] = 0
 
+        # Arrays for gathering jets for an optimal calculation - at most these need to be
+        # 9 x max_jets_per_tile, but will likely be much less than that
+        self.rap_cache = np.empty((9*max_jets_per_tile), dtype=float)
+        self.phi_cache = np.empty((9*max_jets_per_tile), dtype=float)
+        self.index_cache = np.empty((9*max_jets_per_tile), dtype=int)
+        # Also, avoid assignments in the function call!
+        self.drap_cache = np.empty((9*max_jets_per_tile), dtype=float)
+        self.dphi_cache = np.empty((9*max_jets_per_tile), dtype=float)
+        self.dist_cache = np.empty((9*max_jets_per_tile), dtype=float)
+
+
     def fill_with_jets(self, jets:list[PseudoJet], rap, phi):
         # First bulk calculate the bin indexes we need to use
         _irap, _iphi = get_tile_indexes(self.setup.tiles_rap_min, 
