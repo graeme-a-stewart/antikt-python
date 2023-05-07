@@ -267,50 +267,6 @@ def single_jet_self_scan(irap:np.int64, iphi:np.int64, islot:np.int64,
     else:
         akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
 
-    # if np.where(mask[irap,iphi]==False)[0].size == 1:
-    #     # I am the only jet in this tile, no need to scan, I am my NN in this tile
-    #     pass
-    # else:
-    #     _dphi = np.pi - np.abs(np.pi - np.abs(phi[irap,iphi] - phi[irap,iphi,islot]))
-    #     _drap = rap[irap,iphi] - np.float64(rap[irap,iphi,islot])
-    #     _dist = _dphi*_dphi + _drap*_drap
-    #     _dist[islot] = R2 # Avoid measuring the distance 0 to myself!
-    #     _dist[mask[irap,iphi]] = 1e20 # Don't consider any masked jets
-    #     iclosejet = _dist.argmin()
-    #     dist[irap,iphi,islot] = _dist[iclosejet]
-    #     if iclosejet == islot:
-    #         nn[irap,iphi,islot] = -1
-    #     else:
-    #         # This is a manual ravelling, as "ravel_multi_index" isn't supported in numba
-    #         nn[irap,iphi,islot] = irap*(phidim*slotdim) + iphi*slotdim + iclosejet
-
-    # # Now scan neighbour tiles
-    # for jrap, jphi in neighbourtiles[irap, iphi]:
-    #     if jrap == -1:
-    #         continue
-    #     if np.where(mask[jrap,jphi]==False)[0].size == 0:
-    #         continue
-    #     _dphi = np.pi - np.abs(np.pi - np.abs(phi[jrap,jphi] - phi[irap,iphi,islot]))
-    #     _drap = rap[jrap,jphi] - np.float64(rap[irap,iphi,islot])
-    #     _dist = _dphi*_dphi + _drap*_drap
-    #     _dist[mask[jrap,jphi]] = 1e20 # Don't consider any masked jets
-    #     jclosejet = _dist.argmin()
-    #     if _dist[jclosejet] < dist[irap, iphi, islot]:
-    #         dist[irap,iphi,islot] = _dist[jclosejet]
-    #         nn[irap,iphi,islot] = jrap*(phidim*slotdim) + jphi*slotdim + jclosejet
-
-    # # Update akt_dist
-    # if nn[irap,iphi,islot] > -1:
-    #     # Unravel the nn index
-    #     j = nn[irap,iphi,islot]
-    #     jrap = j // (phidim*slotdim)
-    #     j -= jrap*(phidim*slotdim)
-    #     jphi = j // slotdim
-    #     jslot = j - jphi*slotdim
-    #     akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[jrap, jphi, jslot])
-    # else:
-    #     akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
-
 @njit
 def all_jets_scan(rap:npt.ArrayLike, phi:npt.ArrayLike, inv_pt2:npt.ArrayLike,
                         nn:npt.ArrayLike, dist:npt.ArrayLike, akt_dist:npt.ArrayLike,
@@ -499,9 +455,6 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
                                  index_cache=nptiling.index_cache, drap_cache=nptiling.drap_cache,
                                  dphi_cache=nptiling.dphi_cache, dist_cache=nptiling.dist_cache
                                  )
-            # if imerged_jet == 195:
-            #     print(nptiling.dump_jet(newjetindex))
-            #     exit(0)
         else:
             jet_indexA = nptiling.jets_index[ijetA]
             logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA}={jet_indexA} and beam")
