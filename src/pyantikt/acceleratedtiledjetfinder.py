@@ -209,53 +209,61 @@ def single_jet_self_scan(irap:np.int64, iphi:np.int64, islot:np.int64,
                    neighbourtiles:npt.ArrayLike,
                    R2:npt.DTypeLike,
                    phidim:np.int64,
-                   slotdim:np.int64):
+                   slotdim:np.int64,
+                   rap_cache:npt.ArrayLike, phi_cache:npt.ArrayLike,
+                   index_cache:npt.ArrayLike, drap_cache:npt.ArrayLike,
+                   dphi_cache:npt.ArrayLike, dist_cache:npt.ArrayLike):
     """Scan a single jet for its nearest neighbours, including neighbouring tiles"""
     # Saftey first...
     dist[irap,iphi,islot] = R2
     nn[irap,iphi,islot] = -1
 
-    if np.where(mask[irap,iphi]==False)[0].size == 1:
-        # I am the only jet in this tile, no need to scan, I am my NN in this tile
-        pass
-    else:
-        _dphi = np.pi - np.abs(np.pi - np.abs(phi[irap,iphi] - phi[irap,iphi,islot]))
-        _drap = rap[irap,iphi] - np.float64(rap[irap,iphi,islot])
-        _dist = _dphi*_dphi + _drap*_drap
-        _dist[islot] = R2 # Avoid measuring the distance 0 to myself!
-        _dist[mask[irap,iphi]] = 1e20 # Don't consider any masked jets
-        iclosejet = _dist.argmin()
-        dist[irap,iphi,islot] = _dist[iclosejet]
-        if iclosejet == islot:
-            nn[irap,iphi,islot] = -1
-        else:
-            # This is a manual ravelling, as "ravel_multi_index" isn't supported in numba
-            nn[irap,iphi,islot] = irap*(phidim*slotdim) + iphi*slotdim + iclosejet
-
-    # Now scan neighbour tiles
+    # Now look for active jets in all relevant tiles
+    active_jets = np.int32(0)
+    # My tile
+    for jjet in np.where(mask[irap,iphi]==False)[0]:
+        if jjet == islot:
+            # It's me!
+            continue
+        rap_cache[active_jets] = rap[irap,iphi,jjet]
+        phi_cache[active_jets] = phi[irap,iphi,jjet]
+        index_cache[active_jets] = irap*(phidim*slotdim) + iphi*slotdim + jjet
+        active_jets += 1
+    # Neighbour tiles
     for jrap, jphi in neighbourtiles[irap, iphi]:
         if jrap == -1:
             continue
-        if np.where(mask[jrap,jphi]==False)[0].size == 0:
-            continue
-        _dphi = np.pi - np.abs(np.pi - np.abs(phi[jrap,jphi] - phi[irap,iphi,islot]))
-        _drap = rap[jrap,jphi] - np.float64(rap[irap,iphi,islot])
-        _dist = _dphi*_dphi + _drap*_drap
-        _dist[mask[jrap,jphi]] = 1e20 # Don't consider any masked jets
-        jclosejet = _dist.argmin()
-        if _dist[jclosejet] < dist[irap, iphi, islot]:
-            dist[irap,iphi,islot] = _dist[jclosejet]
-            nn[irap,iphi,islot] = jrap*(phidim*slotdim) + jphi*slotdim + jclosejet
+        for jjet in np.where(mask[jrap,jphi]==False)[0]:
+            rap_cache[active_jets] = rap[jrap,jphi,jjet]
+            phi_cache[active_jets] = phi[jrap,jphi,jjet]
+            index_cache[active_jets] = jrap*(phidim*slotdim) + jphi*slotdim + jjet
+            active_jets += 1
 
-    # Update akt_dist
-    if nn[irap,iphi,islot] > -1:
-        # Unravel the nn index
-        j = nn[irap,iphi,islot]
+    if active_jets == 0:
+        akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
+        return
+    
+    # print(f"For {irap},{iphi},{islot} ({rap[irap,iphi,islot],phi[irap,iphi,islot]}) found {active_jets} jets")
+    # print(f"{rap_cache[:active_jets]} {phi_cache[:active_jets]} {index_cache[:active_jets]}")
+
+    # Now perform the array calculation for distance
+    dphi_cache[:active_jets] = np.pi - np.abs(np.pi - np.abs(phi_cache[:active_jets] - phi[irap,iphi,islot]))
+    drap_cache[:active_jets] = rap_cache[:active_jets] - rap[irap,iphi,islot]
+    dist_cache[:active_jets] = (dphi_cache[:active_jets]*dphi_cache[:active_jets] 
+                                + drap_cache[:active_jets]*drap_cache[:active_jets])
+    index_closest = dist_cache[:active_jets].argmin()
+    # print(f"{drap_cache[:active_jets]}\n{dphi_cache[:active_jets]}\n{dist_cache[:active_jets]}\n{index_closest}")
+    # Do we have a jet close to us?
+    if dist_cache[index_closest] < dist[irap,iphi,islot]:
+        dist[irap,iphi,islot] = dist_cache[index_closest]
+        nn[irap,iphi,islot] = index_cache[index_closest]
+        j = index_cache[index_closest]
         jrap = j // (phidim*slotdim)
         j -= jrap*(phidim*slotdim)
         jphi = j // slotdim
         jslot = j - jphi*slotdim
         akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * min(inv_pt2[irap,iphi,islot], inv_pt2[jrap, jphi, jslot])
+        # print(f"Close: {dist[irap,iphi,islot]} {nn[irap,iphi,islot]} {akt_dist[irap,iphi,islot]}")
     else:
         akt_dist[irap,iphi,islot] = dist[irap,iphi,islot] * inv_pt2[irap,iphi,islot]
 
@@ -264,7 +272,10 @@ def all_jets_scan(rap:npt.ArrayLike, phi:npt.ArrayLike, inv_pt2:npt.ArrayLike,
                         nn:npt.ArrayLike, dist:npt.ArrayLike, akt_dist:npt.ArrayLike,
                         mask:npt.ArrayLike,
                         neighbourtiles:npt.ArrayLike, R2:float, phidim:int,
-                        slotdim:int):
+                        slotdim:int,
+                        rap_cache:npt.ArrayLike, phi_cache:npt.ArrayLike,
+                        index_cache:npt.ArrayLike, drap_cache:npt.ArrayLike,
+                        dphi_cache:npt.ArrayLike, dist_cache:npt.ArrayLike):
     active_jets = np.where(mask==False)
     for irap, iphi, islot in zip(active_jets[0], active_jets[1], active_jets[2]):
         single_jet_self_scan(irap=irap, iphi=iphi, islot=islot,
@@ -273,7 +284,11 @@ def all_jets_scan(rap:npt.ArrayLike, phi:npt.ArrayLike, inv_pt2:npt.ArrayLike,
                         mask=mask,
                         neighbourtiles=neighbourtiles, R2=R2,
                         phidim=phidim,
-                        slotdim=slotdim)
+                        slotdim=slotdim,
+                        rap_cache=rap_cache, phi_cache=phi_cache,
+                        index_cache=index_cache, drap_cache=drap_cache,
+                        dphi_cache=dphi_cache, dist_cache=dist_cache
+                        )
 
 
 def find_closest_jets(akt_distance:npt.ArrayLike):
@@ -317,7 +332,7 @@ def add_step_to_history(history: NPHistory, jets: list[PseudoJet],
                                     max_dij_so_far=max_dij_so_far)
 
     local_step = history.next-1
-    logger.debug(f"Added history step {local_step}: {parent1}, {parent2}, {distance}")
+    # logger.debug(f"Added history step {local_step}: {parent1}, {parent2}, {distance}")
 
     if parent1 >= 0:
         if history.child[parent1] != -1:
@@ -383,7 +398,10 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
                         mask=nptiling.mask,
                         neighbourtiles=nptiling.neighbourtiles, R2=R2,
                         phidim=nptiling.setup.n_tiles_phi,
-                        slotdim=nptiling.max_jets_per_tile)
+                        slotdim=nptiling.max_jets_per_tile,
+                        rap_cache=nptiling.rap_cache, phi_cache=nptiling.phi_cache,
+                        index_cache=nptiling.index_cache, drap_cache=nptiling.drap_cache,
+                        dphi_cache=nptiling.dphi_cache, dist_cache=nptiling.dist_cache)
 
     # Each iteration we either merge two jets to one, or we
     # finalise a jet. Thus it takes a number of iterations
@@ -432,7 +450,11 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
                                  mask=nptiling.mask,
                                  neighbourtiles=nptiling.neighbourtiles, R2=R2,
                                  phidim=nptiling.setup.n_tiles_phi,
-                                 slotdim=nptiling.max_jets_per_tile)
+                                 slotdim=nptiling.max_jets_per_tile,
+                                 rap_cache=nptiling.rap_cache, phi_cache=nptiling.phi_cache,
+                                 index_cache=nptiling.index_cache, drap_cache=nptiling.drap_cache,
+                                 dphi_cache=nptiling.dphi_cache, dist_cache=nptiling.dist_cache
+                                 )
         else:
             jet_indexA = nptiling.jets_index[ijetA]
             logger.debug(f"Iteration {iteration+1}: {distance} for jet {ijetA}={jet_indexA} and beam")
@@ -450,7 +472,7 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
         # tile-by-tile, so we also avoid useless rescans by keeping track of where
         # we have already rescanned        
         jets_to_update = np.where(nptiling.nn==iflatjetA)
-        logger.debug(f"To update for jetA: {jets_to_update}")
+        # logger.debug(f"To update for jetA: {jets_to_update}")
         for irap, iphi, islot in zip(jets_to_update[0], jets_to_update[1], jets_to_update[2]):
             if nptiling.mask[irap,iphi,islot]:
                 raise RuntimeError(f"Jet A NN {irap},{iphi},{islot} is masked {nptiling.dump_jet((irap,iphi,islot))}")
@@ -460,10 +482,13 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
                                  mask=nptiling.mask,
                                  neighbourtiles=nptiling.neighbourtiles, R2=R2,
                                  phidim=nptiling.setup.n_tiles_phi,
-                                 slotdim=nptiling.max_jets_per_tile)
+                                 slotdim=nptiling.max_jets_per_tile,
+                                 rap_cache=nptiling.rap_cache, phi_cache=nptiling.phi_cache,
+                                 index_cache=nptiling.index_cache, drap_cache=nptiling.drap_cache,
+                                 dphi_cache=nptiling.dphi_cache, dist_cache=nptiling.dist_cache)
         if (iflatjetB >= 0):
             jets_to_update = np.where(nptiling.nn==iflatjetB)
-            logger.debug(f"To update for jetB: {jets_to_update}")
+            # logger.debug(f"To update for jetB: {jets_to_update}")
             for irap, iphi, islot in zip(jets_to_update[0], jets_to_update[1], jets_to_update[2]):
                 if nptiling.mask[irap,iphi,islot]:
                     raise RuntimeError("Jet B NN {irap},{iphi},{islot} is masked")
@@ -473,6 +498,9 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
                                  neighbourtiles=nptiling.neighbourtiles, R2=R2,
                                  mask=nptiling.mask,
                                  phidim=nptiling.setup.n_tiles_phi,
-                                 slotdim=nptiling.max_jets_per_tile)
+                                 slotdim=nptiling.max_jets_per_tile,
+                                 rap_cache=nptiling.rap_cache, phi_cache=nptiling.phi_cache,
+                                 index_cache=nptiling.index_cache, drap_cache=nptiling.drap_cache,
+                                 dphi_cache=nptiling.dphi_cache, dist_cache=nptiling.dist_cache)
 
     return inclusive_jets(jets, history, ptmin=ptmin)
