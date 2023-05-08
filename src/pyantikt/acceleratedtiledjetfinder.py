@@ -220,20 +220,13 @@ def single_jet_self_scan(irap:np.int64, iphi:np.int64, islot:np.int64,
 
     # Now look for active jets in all relevant tiles
     active_jets = np.int32(0)
-    # My tile
-    for jjet in np.where(mask[irap,iphi]==False)[0]:
-        if jjet == islot:
-            # It's me!
-            continue
-        rap_cache[active_jets] = rap[irap,iphi,jjet]
-        phi_cache[active_jets] = phi[irap,iphi,jjet]
-        index_cache[active_jets] = irap*(phidim*slotdim) + iphi*slotdim + jjet
-        active_jets += 1
-    # Neighbour tiles
     for jrap, jphi in neighbourtiles[irap, iphi]:
         if jrap == -1:
             continue
         for jjet in np.where(mask[jrap,jphi]==False)[0]:
+            if jrap==irap and jphi==iphi and jjet==islot:
+                # It's me!
+                continue
             rap_cache[active_jets] = rap[jrap,jphi,jjet]
             phi_cache[active_jets] = phi[jrap,jphi,jjet]
             index_cache[active_jets] = jrap*(phidim*slotdim) + jphi*slotdim + jjet

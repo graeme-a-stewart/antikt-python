@@ -46,47 +46,25 @@ class NPTiling:
         self.akt_dist.fill(1e20)
         self.nn.fill(-1)
 
-
-        # This tuple holds the rightmost neighbour tiles of any tile
+        # This tuple holds all the neighbour tiles of any tile, including itself!
         # N.B. phi wraps, but rap does not
         # If an entry is (-1,-1) it's an invalid neighbour
-        # The 4 members of this array are up, up-right, right, down-right:
-        #      -  0  1
-        #      -  X  2
-        #      -  -  3
-        self.righttiles = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, 4), dtype=(np.int64, 2))
+        # The 9 members of this array scan increasing phi and increasing rapidity
+        #      1  2  3
+        #      4  0  5
+        #      6  7  8
+        self.neighbourtiles = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, 9), dtype=(np.int64, 2))
         for irap in range(setup.n_tiles_rap):
             for iphi in range(setup.n_tiles_phi):
-                if irap == 0:
-                    self.righttiles[irap,iphi,0] = (-1,-1)
-                    self.righttiles[irap,iphi,1] = (-1,-1)
-                else:
-                    self.righttiles[irap,iphi,0] = (irap-1,iphi)
-                    self.righttiles[irap,iphi,1] = (irap-1,iphi+1 if iphi != setup.n_tiles_phi-1 else 0)
-                self.righttiles[irap,iphi,2] = (irap,iphi+1 if iphi != setup.n_tiles_phi-1 else 0)
-                if irap == setup.n_tiles_rap-1:
-                    self.righttiles[irap,iphi,3] = (-1,-1)
-                else:
-                    self.righttiles[irap,iphi,3] = (irap+1,iphi+1 if iphi != setup.n_tiles_phi-1 else 0)
-
-        # This tuple holds all the neighbour tiles of any tile
-        # N.B. phi wraps, but rap does not
-        # If an entry is (-1,-1) it's an invalid neighbour
-        # The 8 members of this array scan increasing phi and increasing rapidity
-        #      0  1  2
-        #      3  X  4
-        #      5  6  7
-        self.neighbourtiles = np.zeros((setup.n_tiles_rap, setup.n_tiles_phi, 8), dtype=(np.int64, 2))
-        for irap in range(setup.n_tiles_rap):
-            for iphi in range(setup.n_tiles_phi):
-                self.neighbourtiles[irap,iphi,0] = (irap-1,iphi-1)
-                self.neighbourtiles[irap,iphi,1] = (irap-1,iphi)
-                self.neighbourtiles[irap,iphi,2] = (irap-1,iphi+1)
-                self.neighbourtiles[irap,iphi,3] = (irap  ,iphi-1)
-                self.neighbourtiles[irap,iphi,4] = (irap  ,iphi+1)
-                self.neighbourtiles[irap,iphi,5] = (irap+1,iphi-1)
-                self.neighbourtiles[irap,iphi,6] = (irap+1,iphi)
-                self.neighbourtiles[irap,iphi,7] = (irap+1,iphi+1)
+                self.neighbourtiles[irap,iphi,0] = (irap  ,iphi)
+                self.neighbourtiles[irap,iphi,1] = (irap-1,iphi-1)
+                self.neighbourtiles[irap,iphi,2] = (irap-1,iphi)
+                self.neighbourtiles[irap,iphi,3] = (irap-1,iphi+1)
+                self.neighbourtiles[irap,iphi,4] = (irap  ,iphi-1)
+                self.neighbourtiles[irap,iphi,5] = (irap  ,iphi+1)
+                self.neighbourtiles[irap,iphi,6] = (irap+1,iphi-1)
+                self.neighbourtiles[irap,iphi,7] = (irap+1,iphi)
+                self.neighbourtiles[irap,iphi,8] = (irap+1,iphi+1)
                 for neighbour in self.neighbourtiles[irap,iphi]:
                     if neighbour[0] < 0:
                         neighbour[1] = -1
