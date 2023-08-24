@@ -108,7 +108,6 @@ def main():
         mean, stddev = benchmark.get_stats()
         print(f"Mean time per event {mean:,.2f} ± {stddev:,.2f} us")
 
-
     if args.benchmark:
         with open(args.benchmark, mode="w") as benchmark_file:
             print(benchmark.to_json(), file=benchmark_file)

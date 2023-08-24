@@ -36,7 +36,9 @@ def main():
         "--trials", type=int, default=1, help="Number of trials to repeat"
     )
     parser.add_argument("--output", metavar="FILE", help="Write logging output to FILE")
-    parser.add_argument("--jetout", metavar="FILE", help="Write final jet numbers to FILE")
+    parser.add_argument(
+        "--jetout", metavar="FILE", help="Write final jet numbers to FILE"
+    )
     parser.add_argument(
         "--debug", action="store_true", help="Activate logging debugging mode"
     )

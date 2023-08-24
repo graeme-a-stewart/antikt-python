@@ -1,0 +1,11 @@
+name: antikt-python
+channels:
+  - conda-forge
+dependencies:
+  - python ==3.11.*
+  - numba >= 0.57
+  - numpy >= 1.24
+  - black
+  - pip
+  - pip:
+    - pyhepmc
