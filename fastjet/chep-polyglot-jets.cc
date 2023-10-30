@@ -61,11 +61,11 @@ vector<vector<fastjet::PseudoJet>> read_input_events(const char* fname, long max
 }
 
 vector<fastjet::PseudoJet> run_fastjet_clustering(std::vector<fastjet::PseudoJet> input_particles,
-  fastjet::Strategy strategy) {
+  fastjet::Strategy strategy, fastjet::JetAlgorithm algorithm) {
   // create a jet definition: a jet algorithm with a given radius parameter
   fastjet::RecombinationScheme recomb_scheme=fastjet::E_scheme;
   double R = 0.4;
-  fastjet::JetDefinition jet_def(fastjet::antikt_algorithm, R, recomb_scheme, strategy);
+  fastjet::JetDefinition jet_def(algorithm, R, recomb_scheme, strategy);
 
 
   // run the jet clustering with the above jet definition
@@ -80,12 +80,13 @@ vector<fastjet::PseudoJet> run_fastjet_clustering(std::vector<fastjet::PseudoJet
 
 int main(int argc, char* argv[]) {
 
-  if (argc < 2 || argc > 6) {
-    std::cout << "Usage: " << argv[0] << " <HepMC3_input_file> [max_events] [n_trials] [strategy] [dump]" << std::endl;
+  if (argc < 2 || argc > 7) {
+    std::cout << "Usage: " << argv[0] << " <HepMC3_input_file> [max_events] [n_trials] [strategy] [power] [dump]" << std::endl;
     std::cout << " Max events default is -1, which is all the events in the file" << std::endl;
     std::cout << " n_trials default is -1, which is the number of repeats to do" << std::endl;
     std::cout << " Max events default is -1, which is all the events in the file" << std::endl;
     std::cout << " strategy to use, valid values are 'Best' (default), 'N2Plain', 'N2Tiled'" << std::endl;
+    std::cout << " power (-1=antikt, 0=cambridge_achen, 1=inclusive kt)";
     std::cout << " dump - if non-zero, output jets are printed" << std::endl;
     exit(-1);
   }
@@ -94,10 +95,12 @@ int main(int argc, char* argv[]) {
   long trials = 1;
   string mystrategy = "Best";
   bool dump = false;
+  int power = -1;
   if (argc > 2) maxevents = strtoul(argv[2], 0, 0);
   if (argc > 3) trials = strtoul(argv[3], 0, 0);
   if (argc > 4) mystrategy = argv[4];
-  if (argc > 5) dump = true;
+  if (argc > 5) power = stoi(argv[5]);
+  if (argc > 6) dump = true;
 
   // read in input events
   //----------------------------------------------------------
@@ -111,22 +114,28 @@ int main(int argc, char* argv[]) {
   } else if (mystrategy == string("N2Tiled")) {
     strategy = fastjet::N2Tiled;
   }
-  std::cout << mystrategy << endl;
+
+  auto algorithm = fastjet::antikt_algorithm;
+  if (power == 0) {
+    algorithm = fastjet::cambridge_aachen_algorithm;
+  } else if (power == 1) {
+    algorithm = fastjet::kt_algorithm;
+  }
+
+    std::cout << "Strategy: " << mystrategy << "; Alg: " << power << endl;
 
   double time_total = 0.0;
   double time_total2 = 0.0;
   double sigma = 0.0;
+  double time_lowest = 1.0e20;
   for (long trial = 0; trial < trials; ++trial) {
     std::cout << "Trial " << trial << " ";
     auto start_t = std::chrono::steady_clock::now();
     for (size_t ievt = 0; ievt < events.size(); ++ievt) {
-      auto inclusive_jets = run_fastjet_clustering(events[ievt], strategy);
+      auto inclusive_jets = run_fastjet_clustering(events[ievt], strategy, algorithm);
 
       if (dump) {
         std::cout << "Jets in processed event " << ievt+1 << ":" << endl;
-
-      // // label the columns
-      // printf("%5s %15s %15s %15s\n","jet #", "rapidity", "phi", "pt");
     
         // print out the details for each jet
         for (unsigned int i = 0; i < inclusive_jets.size(); i++) {
@@ -142,6 +151,7 @@ int main(int argc, char* argv[]) {
     std::cout << us_elapsed << " us" << endl;
     time_total += us_elapsed;
     time_total2 += us_elapsed*us_elapsed;
+    if (us_elapsed < time_lowest) time_lowest = us_elapsed;
   }
   time_total /= trials;
   time_total2 /= trials;
@@ -152,9 +162,11 @@ int main(int argc, char* argv[]) {
   }
   double mean_per_event = time_total / events.size();
   double sigma_per_event = sigma / events.size();
+  time_lowest /= events.size();
   std::cout << "Processed " << events.size() << " events, " << trials << " times" << endl;
   std::cout << "Total time " << time_total << " us" << endl;
   std::cout << "Time per event " << mean_per_event << " +- " << sigma_per_event << " us" << endl;
+  std::cout << "Lowest time per event " << time_lowest << " us" << endl;
 
   return 0;
 }

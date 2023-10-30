@@ -1,3 +1,5 @@
 chep-polyglot-jets
 *.d
 chep-polyglot-jets.dSYM
+*.out
+*.json

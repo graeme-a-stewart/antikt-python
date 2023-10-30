@@ -3,21 +3,28 @@
 """Convert stdout from the fastjet timing run to JSON for
 comparison with Julia and Python output"""
 
+import argparse
 import json
 from pprint import pprint
 import re
+import sys
 
 
 def main():
+    parser=argparse.ArgumentParser(description="Convert fastjet output to JSON")
+    parser.add_argument("input", help="Fastjet chep-polyglot-jets output")
+    parser.add_argument("output", help="JSON output filename")
+
+    args = parser.parse_args(sys.argv[1:])
+
     fastjet_events = []
     event_number = 0
     jets = []
-    with open("../data/fastjet-new.out") as fastjet_input:
+    with open(args.input) as fastjet_input:
         for line in fastjet_input:
-            line = line.strip()
-            if len(line) == 0:
-                continue
             if line.startswith("#"):
+                continue
+            if re.match(r"^\s$", line):
                 continue
             if line.startswith("Jets in"):
                 # New event header
@@ -34,8 +41,13 @@ def main():
                 else:
                     raise RuntimeError(f"Failed to find event number in {line}")
             else:
+                # Jet contents are prepended by spaces, everything else is irrelevant
+                # (Fastjet headers, final stats)
+                if not line.startswith(" "):
+                    continue
+                line = line.strip()
                 # Should be a jet...
-                print(line.split())
+                # print(line.split())
                 (ijet, rap, phi, pt) = line.split()
                 ijet = int(ijet)
                 rap = float(rap)
@@ -47,7 +59,7 @@ def main():
     fastjet_events.append(new_event)
     # pprint(fastjet_events)
 
-    with open("../data/jet_collections_fastjet.json", "w") as json_out:
+    with open(args.output, "w") as json_out:
         json.dump(fastjet_events, json_out, indent=2)
 
 

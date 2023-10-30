@@ -20,6 +20,6 @@ DEPS:=$(addsuffix .d,$(basename $(SRC)))
 
 chep-polyglot-jets: chep-polyglot-jets.cc
 	$(LINK.cc) -o $@ -Wno-deprecated-declarations  -I $(FASTJET_DIR)/include -L $(FASTJET_DIR)/lib \
--I $(HEPMC3_DIR)/include -L $(HEPMC3_DIR)/lib -L $(HEPMC3_DIR)/lib64 $< -l fastjet -lHepMC3 -lm
+-I $(HEPMC3_DIR)/include -L $(HEPMC3_DIR)/lib $< -l fastjet -lHepMC3 -lm
 
 -include $(DEPS)
