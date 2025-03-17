@@ -1,7 +1,7 @@
 from math import atan2, pi, log, sqrt
 
 
-# A few saftey factor constants
+# A few safety factor constants
 _MaxRap = 1e5
 
 # _invalid_phi = -100.0
@@ -16,7 +16,7 @@ class PseudoJet:
         self.E = E
 
         self.pt2 = px * px + py * py
-        self.inv_pt2 = 1.0 / self.pt2
+        self.inv_pt2 = 1.0 / self.pt2 if self.pt2 != 0.0 else 1.0e10
 
         self.rap = self._set_rap()
         self.phi = self._set_phi()
