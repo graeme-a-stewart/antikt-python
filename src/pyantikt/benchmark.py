@@ -50,3 +50,5 @@ class Benchmark:
         stddev = statistics.stdev(self.runtimes) / self.nevents
         return mean, stddev
     
+    def get_minimum(self):
+        return min(self.runtimes) / self.nevents
