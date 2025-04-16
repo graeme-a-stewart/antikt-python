@@ -83,7 +83,7 @@ def main():
 
     benchmark = Benchmark(nevents=args.maxevents)
 
-    # If we are bencmarking the numba code, do a warm up run
+    # If we are benchmarking the numba code, do a warm up run
     # to jit compile the accelerated code
     if args.trials > 1 and args.numba:
         print("Warm up run with first event to jit compile code")

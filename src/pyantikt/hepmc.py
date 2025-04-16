@@ -14,6 +14,9 @@ def read_jet_particles(
             jet = jets.read()
         for jet in range(nevents):
             jet = jets.read()
+            if jet is None:
+                # No more events in the file
+                break
 
             particles = []
             for particle in jet.particles:
