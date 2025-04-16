@@ -24,6 +24,9 @@ import pyantikt.tiledjetfinder
 
 def main():
     parser = argparse.ArgumentParser(description="Tiled N^2 AntiKt Jet Finder")
+    parser.add_argument("--radius", "-R", type=float, default=0.4, help="Jet radius")
+    parser.add_argument("--ptmin", type=float, default=5.0, help="Exclusive jet pt cut")
+
     parser.add_argument(
         "--skip", type=int, default=0, help="Number of input events to skip"
     )
@@ -86,7 +89,7 @@ def main():
     # to jit compile the accelerated code
     if args.trials > 1 and args.numba:
         print("Warm up run with first event to jit compile code")
-        faster_tiled_N2_cluster(deepcopy(original_events[0]), Rparam=0.4, ptmin=0.5)
+        faster_tiled_N2_cluster(deepcopy(original_events[0]), Rparam=args.radius, ptmin=args.ptmin)
 
     for itrial in range(1, args.trials + 1):
         if args.trials > 1:
@@ -96,7 +99,7 @@ def main():
         start = time.monotonic_ns() / 1000.0  # microseconds
         for ievt, event in enumerate(events, start=1):
             logger.info(f"Event {ievt} has {len(event)} particles")
-            antikt_jets = faster_tiled_N2_cluster(event, Rparam=0.4, ptmin=5.0)
+            antikt_jets = faster_tiled_N2_cluster(event, Rparam=args.radius, ptmin=args.ptmin)
             logger.info(f"Event {ievt}, found {len(antikt_jets)} jets")
             for ijet, jet in enumerate(antikt_jets):
                 logger.info(f"{ijet}, {jet.rap}, {jet.phi}, {jet.pt}")

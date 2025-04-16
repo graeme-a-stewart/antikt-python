@@ -22,6 +22,8 @@ import pyantikt.basicjetfinder
 
 def main():
     parser = argparse.ArgumentParser(description="AntiKt Basic Jet Finder")
+    parser.add_argument("--radius", "-R", type=float, default=0.4, help="Jet radius")
+    parser.add_argument("--ptmin", type=float, default=5.0, help="Exclusive jet pt cut")
     parser.add_argument(
         "--skip", type=int, default=0, help="Number of input events to skip"
     )
@@ -85,7 +87,7 @@ def main():
     # to jit compile the accelerated code
     if args.trials > 1 and args.numba:
         print("Warm up run with first event to jit compile code")
-        basicjetfinder(deepcopy(orignal_events[0]), Rparam=0.4, ptmin=0.5)
+        basicjetfinder(deepcopy(orignal_events[0]), Rparam=args.radius, ptmin=args.ptmin)
 
     if args.jetout:
         fjet = open(args.jetout, "w")
@@ -99,7 +101,7 @@ def main():
         start = time.monotonic_ns() / 1000.0  # microseconds
         for ievt, event in enumerate(events, start=1):
             logger.info(f"Event {ievt} has {len(event)} particles")
-            antikt_jets = basicjetfinder(event, Rparam=0.4, ptmin=5.0)
+            antikt_jets = basicjetfinder(event, Rparam=args.radius, ptmin=args.ptmin)
             logger.info(f"Event {ievt}, found {len(antikt_jets)} jets")
             for ijet, jet in enumerate(antikt_jets):
                 logger.info(f"{ijet}, {jet.rap}, {jet.phi}, {jet.pt}")

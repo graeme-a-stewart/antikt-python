@@ -30,7 +30,7 @@ For both of these strategies there are two *implementations*, one (default) in p
 Running the code it quite straight forward:
 
 ```sh
-$ ./antikt-basic.py --maxevents=100 --trials 4 ../data/events.hepmc3
+$ ./antikt-basic.py --maxevents=100 --trials 4 --radius 1.0 ../data/events.hepmc3
 Trial 1. Processed 100 events in 8,862,307.08 us
 Time per event: 88,623.07 us
 Trial 2. Processed 100 events in 8,861,340.71 us
