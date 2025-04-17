@@ -1,6 +1,6 @@
 from pyantikt.nphistory import NPHistory
 from pyantikt.pseudojet import PseudoJet
-from pyantikt.nptiling import TilingDef, NPTiling
+from pyantikt.nptiling import TilingDef, NPTiling, tile_filling_scan
 
 import logging
 import numpy as np
@@ -161,6 +161,7 @@ def initial_tiling(jets, Rparam=0.4):
 
     tile_size_phi = np.float64(2.0) * np.pi / n_tiles_phi  # >= Rparam and fits in 2pi
 
+    # This returns the rapidity extent, and np arrays of rapidity and phi
     tiles_rap_min, tiles_rap_max, rap, phi = determine_rapidity_extent(jets)
     # print(tiles_rap_min, tiles_rap_max)
 
@@ -171,20 +172,7 @@ def initial_tiling(jets, Rparam=0.4):
     tiles_rap_max = tiles_irap_max * tile_size_rap
     n_tiles_rap = np.int64(tiles_irap_max - tiles_irap_min + 1)
 
-    # We need to do a quick scan, using the tiled definition to find out
-    # how many jets we need to have space for in the tile, i.e., what's the
-    # maximum value in any tile - we basically 2D historgam all the jets
-    # and see what the maximum bin value is
-    myhist = np.histogram2d(rap, phi, bins=[n_tiles_rap, n_tiles_phi],
-                            range=[[tiles_rap_min, tile_size_rap * n_tiles_rap + tiles_rap_min], [0.0, 2*np.pi]])
-    # Can cross check with original here
-
-    # Discovering that sometimes this is under-estimated, with fatal consequences!
-    jet_number_safety = 5
-
-    max_jets_per_tile = np.int64(np.max(myhist[0])) + jet_number_safety
-    logger.debug(f"Max jets per tile: {max_jets_per_tile}")
-
+    # We now know all we need for the tiling parameters
     tiling_setup = TilingDef(
         tiles_rap_min,
         tiles_rap_max,
@@ -195,6 +183,32 @@ def initial_tiling(jets, Rparam=0.4):
         tiles_irap_min,
         tiles_irap_max,
     )
+
+    # Now we need to understand how many jets we need to allocate space for
+    # in the tiles. We do this by scanning the jets and counting how many
+    # jets are in each tile.
+    max_jets_per_tile = tile_filling_scan(tiling_setup, rap, phi)
+
+    # Using this histogram method did not work for some samples, so it evidently
+    # does something a bit different from the actual tiling scan - don't use it now
+    # We need to do a quick scan, using the tiled definition to find out
+    # how many jets we need to have space for in the tile, i.e., what's the
+    # maximum value in any tile - we basically 2D historgam all the jets
+    # and see what the maximum bin value is
+    # myhist = np.histogram2d(rap, phi, bins=[n_tiles_rap, n_tiles_phi],
+    #                         range=[[tiles_rap_min, tile_size_rap * n_tiles_rap + tiles_rap_min], [0.0, 2*np.pi]])
+
+    # Discovering that sometimes this is under-estimated, with fatal consequences!
+    # jet_number_safety = 5
+
+    # max_jets_per_tile_from_hist = np.int64(np.max(myhist[0]))
+    # if max_jets_per_tile_from_hist != max_jets_per_tile:
+    #     logger.debug(
+    #         f"Jet counts from histogram: {max_jets_per_tile_from_hist}; from tiling scan: {max_jets_per_tile}"
+    #     )
+    logger.debug(f"Max jets per tile: {max_jets_per_tile}")
+
+
 
     # allocate the tiles
     tiling = NPTiling(tiling_setup, max_jets_per_tile)

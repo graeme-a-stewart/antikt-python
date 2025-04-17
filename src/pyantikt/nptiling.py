@@ -172,3 +172,16 @@ def get_tile_indexes(tiles_rap_min:npt.DTypeLike,
     # print(_iphi)
 
     return _irap, _iphi
+
+def tile_filling_scan(tiling_setup:NPTiling,
+                      rap:npt.ArrayLike,
+                      phi:npt.ArrayLike):
+    irap, iphi = get_tile_indexes(tiling_setup.tiles_rap_min, 
+                            tiling_setup.tile_size_rap,
+                            tiling_setup.n_tiles_rap,
+                            tiling_setup.n_tiles_phi,
+                            rap, phi)
+    tile_count = np.zeros((tiling_setup.n_tiles_rap, tiling_setup.n_tiles_phi), dtype=int)
+    for ijet in range(len(rap)):
+        tile_count[irap[ijet], iphi[ijet]] += 1
+    return np.max(tile_count)
