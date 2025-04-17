@@ -1,5 +1,8 @@
 # Class definitions for tiling and tiled jets, numpy version
 
+import logging
+logger = logging.getLogger("jetfinder")
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -101,8 +104,9 @@ class NPTiling:
             try:
                 islot = np.where(self.mask[_irap[ijet], _iphi[ijet]])[0][0]
             except IndexError:
-                print(f"No free tile slot at ({_irap[ijet]}, {_iphi[ijet]})")
-                print(ijet, _irap[ijet], _iphi[ijet], self.mask[_irap[ijet], _iphi[ijet]])
+                logger.fatal(f"No free tile slot at ({_irap[ijet]}, {_iphi[ijet]})")
+                logger.fatal(f"{ijet}, {_irap[ijet]}, {_iphi[ijet]}, {self.mask[_irap[ijet], _iphi[ijet]]}")
+                exit(1)
             self.rap[_irap[ijet], _iphi[ijet], islot] = jet.rap
             self.phi[_irap[ijet], _iphi[ijet], islot] = jet.phi
             self.inv_pt2[_irap[ijet], _iphi[ijet], islot] = jet.inv_pt2
@@ -130,8 +134,9 @@ class NPTiling:
         try:
             islot = np.where(self.mask[_irap, _iphi])[0][0]
         except IndexError:
-            print(f"No free tile slot at ({_irap}, {_iphi})")
-            print(_irap, _iphi, self.mask[_irap, _iphi])
+            logger.fatal(f"No free tile slot at ({_irap}, {_iphi})")
+            logger.fatal(f"{_irap}, {_iphi}, {self.mask[_irap, _iphi]}")
+            exit(1)
         self.rap[_irap, _iphi, islot] = newjet.rap
         self.phi[_irap, _iphi, islot] = newjet.phi
         self.inv_pt2[_irap, _iphi, islot] = newjet.inv_pt2

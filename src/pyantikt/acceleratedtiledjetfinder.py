@@ -179,8 +179,11 @@ def initial_tiling(jets, Rparam=0.4):
                             range=[[tiles_rap_min, tile_size_rap * n_tiles_rap + tiles_rap_min], [0.0, 2*np.pi]])
     # Can cross check with original here
 
-    max_jets_per_tile = np.int64(np.max(myhist[0]))
-    # print(f"Max jets per tile: {max_jets_per_tile}")
+    # Discovering that sometimes this is under-estimated, with fatal consequences!
+    jet_number_safety = 5
+
+    max_jets_per_tile = np.int64(np.max(myhist[0])) + jet_number_safety
+    logger.debug(f"Max jets per tile: {max_jets_per_tile}")
 
     tiling_setup = TilingDef(
         tiles_rap_min,
@@ -292,7 +295,7 @@ def find_closest_jets(akt_distance:npt.ArrayLike):
 
 def do_debug_scan(nptiling:NPTiling, ijet):
     print(f"Debug scan on {nptiling.dump_jet(ijet)}")
-    print(f"NN Tiles: {nptiling.righttiles[ijet[0], ijet[1]]}")
+    print(f"NN Tiles: {nptiling.neighbourtiles[ijet[0], ijet[1]]}")
     min_dist = 1e20
     nn = -1
     for irap in range(nptiling.setup.n_tiles_rap):
@@ -301,10 +304,11 @@ def do_debug_scan(nptiling:NPTiling, ijet):
                 _dphi = np.pi - np.abs(np.pi - np.abs(nptiling.phi[ijet] - nptiling.phi[irap,iphi,islot]))
                 _drap = nptiling.rap[ijet] - nptiling.rap[irap,iphi,islot]
                 _dist = _dphi*_dphi + _drap*_drap
-                print(f"{irap},{iphi},{islot} -> {_dist}: ", end="")
-                print(nptiling.dump_jet((irap,iphi,islot)))
-                if min_dist > _dist and (irap != ijet[0] or iphi != ijet[1] or islot != ijet[2]):
-                    min_dist = _dist
+                _min_dist = np.min(_dist)
+                print(f"{irap},{iphi},{islot} -> {_min_dist}: ", end="")
+                # print(nptiling.dump_jet((irap,iphi,islot)))
+                if min_dist > _min_dist and (irap != ijet[0] or iphi != ijet[1] or islot != ijet[2]):
+                    min_dist = _min_dist
                     nn = np.ravel_multi_index((irap, iphi, islot), nptiling.nn.shape)
     print(f"Got minimum distance {min_dist} to {nn}")
 
@@ -408,6 +412,12 @@ def faster_tiled_N2_cluster(initial_particles: list[PseudoJet], Rparam: float=0.
 
         # Add normalisation for real distance
         distance *= invR2
+
+        # Debug
+        # if (iteration == 12):
+        #     # print("HELLO:", nptiling.akt_dist)
+        #     # do_debug_scan(nptiling, [0,1,2]) # Corresponds to jet 52!
+        #     exit(0)
 
         if (iflatjetB >= 0):
             # This is the index in the PseudoJet array

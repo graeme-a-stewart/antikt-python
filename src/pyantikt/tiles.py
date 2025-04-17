@@ -122,7 +122,7 @@ def rightneighbours(row: int, column: int, setup: TilingDef) -> list[tuple[int, 
 
 
 def surrounding_tiles(tile_index: tuple[int, int], tiling: Tiling):
-    """Return the set of valid surrounging tiles for a particular tile index"""
+    """Return the set of valid surrounding tiles for a particular tile index"""
     surrounding_tiles = set()
     for delta_row in range(-1, 2):
         for delta_column in range(-1, 2):
