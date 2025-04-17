@@ -114,8 +114,8 @@ def main():
     if args.trials > 1:
         mean, stddev = benchmark.get_stats()
         print(f"Mean time per event {mean:.2f} ± {stddev:.2f} us")
-        minimum = benchmark.get_minimum()
-        print(f"Minimum time per event {minimum:.2f} us")
+    minimum = benchmark.get_minimum()
+    print(f"Minimum time per event {minimum:.2f} us")
 
     if args.benchmark:
         with open(args.benchmark, mode="w") as benchmark_file:
