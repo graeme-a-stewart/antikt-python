@@ -187,7 +187,11 @@ def initial_tiling(jets, Rparam=0.4):
     # Now we need to understand how many jets we need to allocate space for
     # in the tiles. We do this by scanning the jets and counting how many
     # jets are in each tile.
-    max_jets_per_tile = tile_filling_scan(tiling_setup, rap, phi)
+    #
+    # Note we add a safety value of 1 to the maximum number of jets per tile, because
+    # it is possible that two jets from the corners of different tiles can merge into
+    # a target tile which is at its maximum capacity.
+    max_jets_per_tile = tile_filling_scan(tiling_setup, rap, phi)+1
 
     # Using this histogram method did not work for some samples, so it evidently
     # does something a bit different from the actual tiling scan - don't use it now
