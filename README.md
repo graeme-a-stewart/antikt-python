@@ -12,7 +12,14 @@ This code has been tested and should run fine in Python 3.10 to at least 3.13.
 
 ### Environment
 
-Use the `environment.yml` file to setup the environment (you may wish to edit the main Python version first) with conda/mamba.
+Use the `environment.yml` file to setup the environment (you may wish to edit the main Python version first) with conda/mamba. e.g.,
+
+```sh
+conda env create
+conda activate antikt-python
+```
+
+(This is the supported way to have the correct dependencies installed.)
 
 ### Running
 
